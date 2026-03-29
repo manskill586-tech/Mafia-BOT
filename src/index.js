@@ -11677,6 +11677,22 @@ async function startTelegram() {
         console.log("Telegram bot is running (webhook).");
         return;
       } catch (err) {
+        if (err?.code === "EADDRINUSE") {
+          console.warn(
+            `Telegram webhook port ${PORT} is already in use. Falling back to polling.`
+          );
+          try {
+            await telegramBot.telegram.deleteWebhook();
+          } catch (deleteErr) {
+            console.warn(
+              "Failed to delete Telegram webhook before polling:",
+              deleteErr?.message || deleteErr
+            );
+          }
+          await telegramBot.launch();
+          console.log("Telegram bot is running (polling).");
+          return;
+        }
         const retryAfter =
           err?.response?.parameters?.retry_after ||
           err?.parameters?.retry_after ||
