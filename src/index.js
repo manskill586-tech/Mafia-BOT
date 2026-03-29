@@ -11665,18 +11665,28 @@ async function startTelegram() {
       TELEGRAM_WEBHOOK_PATH.startsWith("/")
         ? TELEGRAM_WEBHOOK_PATH
         : `/${TELEGRAM_WEBHOOK_PATH}`;
-    const webhookUrl = `${TELEGRAM_WEBHOOK_DOMAIN}${hookPath}`;
     let attempt = 0;
     const maxAttempts = 3;
     while (attempt < maxAttempts) {
       try {
-        await telegramBot.telegram.setWebhook(webhookUrl);
         await telegramBot.launch({
           webhook: { domain: TELEGRAM_WEBHOOK_DOMAIN, hookPath, port: PORT },
         });
         console.log("Telegram bot is running (webhook).");
         return;
       } catch (err) {
+        if (telegramBot.webhookServer) {
+          try {
+            telegramBot.webhookServer.close();
+          } catch (closeErr) {
+            console.warn(
+              "Failed to close Telegram webhook server:",
+              closeErr?.message || closeErr
+            );
+          } finally {
+            telegramBot.webhookServer = undefined;
+          }
+        }
         if (err?.code === "EADDRINUSE") {
           console.warn(
             `Telegram webhook port ${PORT} is already in use. Falling back to polling.`
