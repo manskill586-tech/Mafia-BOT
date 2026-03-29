@@ -1,0 +1,61 @@
+{
+  "_metadata": {
+    "major_version": 2,
+    "minor_version": 1
+  },
+  "display_information": {
+    "name": "Mafia Bot",
+    "description": "A mafia game bot in Slack."
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "MafiaBot",
+      "always_online": false
+    },
+    "app_home": {
+      "home_tab_enabled": true,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": false
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "app_mentions:read",
+        "chat:write",
+        "channels:read",
+        "channels:history",
+        "groups:read",
+        "groups:history",
+        "mpim:history",
+        "im:history",
+        "im:write",
+        "users:read",
+        "groups:write",
+        "mpim:write",
+        "pins:write",
+        "commands"
+      ]
+    }
+  },
+  "settings": {
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": true,
+    "is_hosted": false,
+    "token_rotation_enabled": false,
+    "event_subscriptions": {
+      "bot_events": [
+        "member_joined_channel",
+        "app_home_opened",
+        "app_mention",
+        "message.channels",
+        "message.groups",
+        "message.mpim",
+        "message.im"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": true
+    }
+  }
+}
