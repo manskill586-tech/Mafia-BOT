@@ -1572,15 +1572,34 @@ function getByPath(obj, key) {
   return key.split(".").reduce((acc, part) => (acc ? acc[part] : undefined), obj);
 }
 
+const EMOJI_FIXES = [
+  { re: /\?{4,}/g, val: "\u2728" }, // ✨
+  { re: /\?{3}/g, val: "\u2B50" }, // ⭐
+  { re: /\?{2}/g, val: "\u{1F539}" }, // 🔹
+];
+
+function fixTextArtifacts(text) {
+  if (text === null || text === undefined) return "";
+  let out = String(text);
+  // Replace encoding artifacts like "self?save" -> "self-save"
+  out = out.replace(/([\p{L}\p{N}])\?([\p{L}\p{N}])/gu, "$1-$2");
+  // Replace emoji placeholders like "??"/"???"
+  for (const { re, val } of EMOJI_FIXES) {
+    out = out.replace(re, val);
+  }
+  return out;
+}
+
 function t(lang, key, params = {}) {
   const safeLang = LANGS.includes(lang) ? lang : DEFAULT_LANG;
   const dict = I18N[safeLang] || I18N[DEFAULT_LANG];
   const template = getByPath(dict, key) || getByPath(I18N[DEFAULT_LANG], key) || key;
 
-  return String(template).replace(/\{(\w+)\}/g, (match, name) => {
+  const rendered = String(template).replace(/\{(\w+)\}/g, (match, name) => {
     if (params[name] === undefined || params[name] === null) return "";
     return String(params[name]);
   });
+  return fixTextArtifacts(rendered);
 }
 
 function normalizeLang(lang) {
