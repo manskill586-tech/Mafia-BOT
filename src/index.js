@@ -39,7 +39,7 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const TELEGRAM_WEBHOOK_DOMAIN = process.env.TELEGRAM_WEBHOOK_DOMAIN || "";
 const TELEGRAM_WEBHOOK_PATH = process.env.TELEGRAM_WEBHOOK_PATH || "/telegram";
 const PORT = Number(process.env.PORT) || 3000;
-const SLACK_PORT = Number(process.env.SLACK_PORT) || 0;
+const SLACK_PORT = Number(process.env.SLACK_PORT);
 const BUTTON_PAGE_SIZE = 10;
 const BUTTONS_PER_ROW = 5;
 const FIND_PAGE_SIZE = 5;
@@ -11764,11 +11764,16 @@ function restoreActiveGames() {
 (async () => {
   const useTelegramWebhook = Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_WEBHOOK_DOMAIN);
   const slackPort = useTelegramWebhook
-    ? process.env.SLACK_PORT
+    ? Number.isFinite(SLACK_PORT) && SLACK_PORT > 0
       ? SLACK_PORT
       : 3001
     : PORT;
   await app.start(slackPort);
+  if (useTelegramWebhook) {
+    console.log(
+      `Slack listening on port ${slackPort} to avoid conflict with Telegram webhook port ${PORT}.`
+    );
+  }
   await initBotIdentity(app.client);
   try {
     await startTelegram();
