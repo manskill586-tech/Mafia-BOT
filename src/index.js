@@ -4,9 +4,9 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
-const Database = require("better-sqlite3");
 const { App, LogLevel } = require("@slack/bolt");
 const { Telegraf, Markup } = require("telegraf");
+const db = require("./db");
 
 const REQUIRED_ENV = [
   "SLACK_BOT_TOKEN",
@@ -141,47 +141,47 @@ function setTelegramMessageId(value) {
 const I18N = {
   en: {
     role: {
-      mafia: "😈 Mafia",
-      doctor: "🧑‍⚕️ Doctor",
-      detective: "🕵️ Detective",
-      mayor: "🎩 Mayor",
-      bodyguard: "🛡️ Bodyguard",
-      town: "👤 Townsperson",
-      jester: "🤡 Jester",
-      godfather: "🕴️ Godfather",
-      lucky: "🍀 Lucky",
-      bum: "🧴 Bum",
-      sergeant: "🎖️ Sergeant",
-      lawyer: "⚖️ Lawyer",
-      stalker: "🎯 Stalker",
+      mafia: "?? Mafia",
+      doctor: "????? Doctor",
+      detective: "??? Detective",
+      mayor: "?? Mayor",
+      bodyguard: "??? Bodyguard",
+      town: "?? Townsperson",
+      jester: "?? Jester",
+      godfather: "??? Godfather",
+      lucky: "?? Lucky",
+      bum: "?? Bum",
+      sergeant: "??? Sergeant",
+      lawyer: "?? Lawyer",
+      stalker: "?? Stalker",
     },
     role_help: {
       mafia:
-        "😈 You are Mafia. Coordinate at night, choose a target, and reach parity with the town.",
+        "?? You are Mafia. Coordinate at night, choose a target, and reach parity with the town.",
       godfather:
-        "🕴️ You are the Godfather. You are mafia, but the Detective sees you as Town.",
+        "??? You are the Godfather. You are mafia, but the Detective sees you as Town.",
       doctor:
-        "🧑‍⚕️ You are the Doctor. Each night choose someone to save from death (including yourself within the limit).",
+        "????? You are the Doctor. Each night choose someone to save from death (including yourself within the limit).",
       detective:
-        "🕵️ You are the Detective. Each night you can either check a player or kill a target (only one action).",
+        "??? You are the Detective. Each night you can either check a player or kill a target (only one action).",
       mayor:
-        "🎩 You are the Mayor. Your vote counts as 2 during the day.",
+        "?? You are the Mayor. Your vote counts as 2 during the day.",
       bodyguard:
-        "🛡️ You are the Bodyguard. Choose a player to protect; if mafia attacks them, you take the hit.",
+        "??? You are the Bodyguard. Choose a player to protect; if mafia attacks them, you take the hit.",
       jester:
-        "🤡 You are the Jester. If you are executed by vote, you win instantly.",
+        "?? You are the Jester. If you are executed by vote, you win instantly.",
       town:
-        "👤 You are a Townsperson. Find mafia and vote them out.",
+        "?? You are a Townsperson. Find mafia and vote them out.",
       lucky:
-        "🍀 You are Lucky. Each night you have a 50% chance to survive any killing attempt.",
+        "?? You are Lucky. Each night you have a 50% chance to survive any killing attempt.",
       bum:
-        "🧴 You are the Bum. Visit someone at night; if they die, you witness who killed them.",
+        "?? You are the Bum. Visit someone at night; if they die, you witness who killed them.",
       sergeant:
-        "🎖️ You are the Sergeant. The Detective shares results with you. If the Detective dies, you get their actions.",
+        "??? You are the Sergeant. The Detective shares results with you. If the Detective dies, you get their actions.",
       lawyer:
-        "⚖️ You are the Lawyer. At night protect a player; if you protect mafia, the Detective sees them as Town. Your goal is mafia victory.",
+        "?? You are the Lawyer. At night protect a player; if you protect mafia, the Detective sees them as Town. Your goal is mafia victory.",
       stalker:
-        "🎯 You are the Stalker. You have a contract on a role. Kill that role yourself to score a win.",
+        "?? You are the Stalker. You have a contract on a role. Kill that role yourself to score a win.",
     },
     time: {
       sec: "{seconds} sec",
@@ -189,83 +189,83 @@ const I18N = {
       min_sec: "{minutes} min {seconds} sec",
     },
     button: {
-      join: "➕ Join",
-      leave: "➖ Leave",
-      start: "▶️ Start",
-      extend: "⏳ Extend +2m",
-      end: "⏹️ End",
-      ready: "✅ Ready",
-      abstain: "🤐 Abstain",
-      no_kill: "🛑 No kill",
-      role_help: "ℹ️ What to do?",
-      detective_check: "🔍 Check",
-      detective_kill: "🎯 Kill",
-      prev: "◀️ Prev",
-      next: "▶️ Next",
-      page: "📄 Page {page}/{total}",
-      help_add: "➕ Add bot",
-      help_commands: "📜 Commands",
-      help_settings: "⚙️ Settings",
-      find_games: "🔎 Find games",
-      my_channels: "🗂️ My channels",
-      faq: "❓ FAQ",
-      back: "⬅️ Back",
-      public: "🌐 Public",
-      private: "🔒 Private",
-      filter_active: "🟢 Active",
-      filter_recruiting: "🟡 Recruiting",
-      filter_inactive: "⚪ Inactive",
-      filter_lang_all: "🌍 All",
-      filter_lang_en: "🇬🇧 ENG",
-      filter_lang_ru: "🇷🇺 RU",
-      lang_en: "🇬🇧 English",
-      lang_ru: "🇷🇺 Russian",
+      join: "? Join",
+      leave: "? Leave",
+      start: "?? Start",
+      extend: "? Extend +2m",
+      end: "?? End",
+      ready: "? Ready",
+      abstain: "?? Abstain",
+      no_kill: "?? No kill",
+      role_help: "?? What to do?",
+      detective_check: "?? Check",
+      detective_kill: "?? Kill",
+      prev: "?? Prev",
+      next: "?? Next",
+      page: "?? Page {page}/{total}",
+      help_add: "? Add bot",
+      help_commands: "?? Commands",
+      help_settings: "?? Settings",
+      find_games: "?? Find games",
+      my_channels: "??? My channels",
+      faq: "? FAQ",
+      back: "?? Back",
+      public: "?? Public",
+      private: "?? Private",
+      filter_active: "?? Active",
+      filter_recruiting: "?? Recruiting",
+      filter_inactive: "? Inactive",
+      filter_lang_all: "?? All",
+      filter_lang_en: "???? ENG",
+      filter_lang_ru: "???? RU",
+      lang_en: "???? English",
+      lang_ru: "???? Russian",
     },
     dashboard: {
-      title: "🧭 Game Dashboard",
-      phase: "🧭 Phase: {phase}",
-      timer: "⏳ Timer: {time}",
-      alive: "🧍 Alive ({count}): {list}",
-      ready: "✅ Ready: {ready}/{total}",
+      title: "?? Game Dashboard",
+      phase: "?? Phase: {phase}",
+      timer: "? Timer: {time}",
+      alive: "?? Alive ({count}): {list}",
+      ready: "? Ready: {ready}/{total}",
     },
     home: {
-      title: "🏠 MafiaBot",
-      tagline: "🎮 Your Mafia game control center for Slack. (Developer: @bob)",
+      title: "?? MafiaBot",
+      tagline: "?? Your Mafia game control center for Slack. (Developer: @bob)",
       quickstart:
-        "*🚀 Quick Start*\n" +
-        "1️⃣ Add me to a channel: `/invite @MafiaBot`\n" +
-        "2️⃣ Create a lobby: `@MafiaBot create`\n" +
-        "3️⃣ Players press `Join`, host presses `Start` or everyone `Ready`",
+        "*?? Quick Start*\n" +
+        "1?? Add me to a channel: `/invite @MafiaBot`\n" +
+        "2?? Create a lobby: `@MafiaBot create`\n" +
+        "3?? Players press `Join`, host presses `Start` or everyone `Ready`",
       controls:
-        "*🧩 Lobby Controls*\n" +
+        "*?? Lobby Controls*\n" +
         "- Buttons: `Join`, `Leave`, `Ready`, `Start`, `Extend`, `End`\n" +
         "- Commands: `@MafiaBot join`, `leave`, `start`, `extend 2`, `status`, `config`",
       gameplay:
-        "*🌙 During the Game*\n" +
+        "*?? During the Game*\n" +
         "- Night actions and day voting arrive in DM\n" +
         "- `whisper <text>` in DM once per day\n" +
         "- If eliminated, you get one “last words” DM",
       features:
-        "*✨ Highlights*\n" +
+        "*? Highlights*\n" +
         "- Roles: Mafia, Doctor, Detective, Mayor, Bodyguard, Jester, Godfather, Lucky, Bum, Sergeant, Lawyer, Stalker\n" +
-        "- Anonymous voting, auto‑timers, saved state (SQLite)\n" +
+        "- Anonymous voting, auto?timers, saved state (SQLite)\n" +
         "- Mafia room + graveyard (if permissions allow)",
       tips:
-        "*💡 Tips*\n" +
+        "*?? Tips*\n" +
         "- If you have multiple games, include `#channel` in DM commands\n" +
         "- Change language in DM: `lang en` / `lang ru`\n" +
         "- Edit channel defaults in DM: `My channels`\n" +
         "- Open FAQ in DM: `FAQ`",
-      stats_title: "📊 Your stats",
+      stats_title: "?? Your stats",
       stats_line:
         "Games: {games} • Wins: {wins} • Losses: {losses} • Winrate: {rate}%",
-      channel_stats_title: "🧩 This channel",
+      channel_stats_title: "?? This channel",
       channel_stats_line:
         "Games: {games} • Wins: {wins} • Losses: {losses} • Winrate: {rate}%",
-      role_stats_title: "🎭 Role stats",
-      role_stats_empty: "ℹ️ No role stats yet.",
-      current_title: "🕹️ Current game",
-      current_none: "ℹ️ No active game.",
+      role_stats_title: "?? Role stats",
+      role_stats_empty: "?? No role stats yet.",
+      current_title: "??? Current game",
+      current_none: "?? No active game.",
       current_line:
         "Channel: {channel}\n" +
         "Phase: {phase}\n" +
@@ -273,446 +273,446 @@ const I18N = {
         "Alive: {alive}\n" +
         "You: {status}\n" +
         "Role: {role}",
-      status_alive: "✅ Alive",
-      status_dead: "❌ Eliminated",
-      role_unknown: "ℹ️ Unknown",
-      history_title: "🌙 Last 3 nights",
-      history_empty: "ℹ️ No night results yet.",
-      history_line: "🌙 Night {round}: {text}",
+      status_alive: "? Alive",
+      status_dead: "? Eliminated",
+      role_unknown: "?? Unknown",
+      history_title: "?? Last 3 nights",
+      history_empty: "?? No night results yet.",
+      history_line: "?? Night {round}: {text}",
     },
     find: {
-      prompt_public: "ℹ️ Make {channel} public in Find Games?",
-      set_public: "✅ {channel} is now public in Find Games.",
-      set_private: "ℹ️ {channel} is private and won't be listed.",
-      private_not_allowed: "❌ Private channels can't be listed in Find Games.",
-      title: "🔎 Find games",
-      empty: "ℹ️ No channels match this filter.",
-      status_active: "🟢 Active — {phase} {round} • Alive {alive}",
-      status_recruiting: "🟡 Recruiting — {count}/{min}, starts in {time}",
-      status_inactive: "⚪ Inactive — no active game",
-      filters: "🎛️ Filter:",
-      filter_lang: "🌐 Language:",
-      lang_label_en: "🇬🇧 ENG",
-      lang_label_ru: "🇷🇺 RU",
+      prompt_public: "?? Make {channel} public in Find Games?",
+      set_public: "? {channel} is now public in Find Games.",
+      set_private: "?? {channel} is private and won't be listed.",
+      private_not_allowed: "? Private channels can't be listed in Find Games.",
+      title: "?? Find games",
+      empty: "?? No channels match this filter.",
+      status_active: "?? Active — {phase} {round} • Alive {alive}",
+      status_recruiting: "?? Recruiting — {count}/{min}, starts in {time}",
+      status_inactive: "? Inactive — no active game",
+      filters: "??? Filter:",
+      filter_lang: "?? Language:",
+      lang_label_en: "???? ENG",
+      lang_label_ru: "???? RU",
     },
     faq: {
-      title: "❓ FAQ",
+      title: "? FAQ",
       intro:
-        "ℹ️ Choose a question below. You can also type `faq <id>` in DM to open a specific answer.",
-      id_label: "🔗 FAQ ID: `faq {id}`",
-      not_found: "⚠️ Question not found. Showing FAQ list.",
-      command_open: "❓ Open the FAQ:",
-      command_detail: "❓ Open FAQ question `{id}`:",
-      open_button: "❓ Open FAQ",
+        "?? Choose a question below. You can also type `faq <id>` in DM to open a specific answer.",
+      id_label: "?? FAQ ID: `faq {id}`",
+      not_found: "?? Question not found. Showing FAQ list.",
+      command_open: "? Open the FAQ:",
+      command_detail: "? Open FAQ question `{id}`:",
+      open_button: "? Open FAQ",
     },
     my_channels: {
-      title: "🗂️ My channels",
-      empty: "ℹ️ No channels yet.",
-      status_public: "🌐 Public",
-      status_private: "🔒 Private",
-      not_owner: "❌ You are not the owner for this channel.",
-      saved: "✅ Channel settings saved.",
-      edit_intro: "⚙️ Editing {channel}",
+      title: "??? My channels",
+      empty: "?? No channels yet.",
+      status_public: "?? Public",
+      status_private: "?? Private",
+      not_owner: "? You are not the owner for this channel.",
+      saved: "? Channel settings saved.",
+      edit_intro: "?? Editing {channel}",
     },
     settings: {
-      title: "⚙️ Channel settings",
-      privacy_label: "🔎 Find Games visibility",
-      privacy_public: "🌐 Public",
-      privacy_private: "🔒 Private",
-      channel_lang: "🌐 Channel language",
+      title: "?? Channel settings",
+      privacy_label: "?? Find Games visibility",
+      privacy_public: "?? Public",
+      privacy_private: "?? Private",
+      channel_lang: "?? Channel language",
       channel_lang_en: "English (ENG)",
       channel_lang_ru: "Russian (RU)",
-      day_minutes: "☀️ Day minutes",
-      night_minutes: "🌙 Night minutes",
-      lobby_minutes: "🧩 Lobby minutes",
-      min_players: "👥 Minimum players",
-      extend_policy: "🧩 Who can extend lobby?",
-      extend_host: "👑 Host only",
-      extend_any: "👥 Anyone",
-      warning_1: "⚠️ Warning #1 (sec)",
-      warning_2: "⚠️ Warning #2 (sec)",
-      auto_shorten: "⏱️ Auto‑shorten phase",
-      whisper_enabled: "💬 Whisper enabled",
-      allow_abstain: "🤐 Allow abstain",
-      allow_no_kill: "🛑 Allow no‑kill",
-      doctor_self_save: "🧑‍⚕️ Self‑save limit",
-      toggle_on: "✅ On",
-      toggle_off: "❌ Off",
-      submit: "✅ Save",
-      cancel: "❌ Cancel",
-      invalid_number: "⚠️ Enter a valid number.",
-      invalid_min_players: "⚠️ Min players must be at least 4.",
-      invalid_warning: "⚠️ Warnings must be > 0.",
-      invalid_self_save: "⚠️ Self‑save limit must be >= 0.",
+      day_minutes: "?? Day minutes",
+      night_minutes: "?? Night minutes",
+      lobby_minutes: "?? Lobby minutes",
+      min_players: "?? Minimum players",
+      extend_policy: "?? Who can extend lobby?",
+      extend_host: "?? Host only",
+      extend_any: "?? Anyone",
+      warning_1: "?? Warning #1 (sec)",
+      warning_2: "?? Warning #2 (sec)",
+      auto_shorten: "?? Auto?shorten phase",
+      whisper_enabled: "?? Whisper enabled",
+      allow_abstain: "?? Allow abstain",
+      allow_no_kill: "?? Allow no?kill",
+      doctor_self_save: "????? Self?save limit",
+      toggle_on: "? On",
+      toggle_off: "? Off",
+      submit: "? Save",
+      cancel: "? Cancel",
+      invalid_number: "?? Enter a valid number.",
+      invalid_min_players: "?? Min players must be at least 4.",
+      invalid_warning: "?? Warnings must be > 0.",
+      invalid_self_save: "?? Self?save limit must be >= 0.",
     },
     dm: {
       lang_prompt:
-        "🌐 Choose language below (English / Русский). You can change later with `lang en` / `lang ru`.",
-      lang_set_en: "✅ Language set to English.",
-      lang_set_ru: "✅ Language set to Russian.",
-      lang_usage: "ℹ️ Usage: `lang en` or `lang ru`.",
+        "?? Choose language below (English / Русский). You can change later with `lang en` / `lang ru`.",
+      lang_set_en: "? Language set to English.",
+      lang_set_ru: "? Language set to Russian.",
+      lang_usage: "?? Usage: `lang en` or `lang ru`.",
       lang_change_command:
-        "ℹ️ Language is already set. Change it with `lang en` / `lang ru`.",
+        "?? Language is already set. Change it with `lang en` / `lang ru`.",
       help_intro_tg:
-        "👋 Hi! I'm MafiaBot for Telegram.\n" +
-        "🚀 Quick start:\n" +
+        "?? Hi! I'm MafiaBot for Telegram.\n" +
+        "?? Quick start:\n" +
         "1) Add me to a group\n" +
         "2) In group: `/create` to open a lobby\n" +
         "3) Players `/join`, host `/start`\n" +
-        "💬 Night/day actions arrive here as buttons",
+        "?? Night/day actions arrive here as buttons",
       help_add_tg:
-        "➕ Add me to a Telegram group. Optional: give admin rights so I can delete messages from eliminated players.",
+        "? Add me to a Telegram group. Optional: give admin rights so I can delete messages from eliminated players.",
       help_commands_tg:
-        "📜 Group commands: `/create`, `/join`, `/leave`, `/start`, `/extend 2`, `/status`, `/config`, `/end`",
+        "?? Group commands: `/create`, `/join`, `/leave`, `/start`, `/extend 2`, `/status`, `/config`, `/end`",
       help_settings_tg:
-        "⚙️ Settings: use `/config` in the group, and `/mychannels` here to edit default channel settings.",
+        "?? Settings: use `/config` in the group, and `/mychannels` here to edit default channel settings.",
       help_intro:
-        "👋 Hi! I'm MafiaBot.\n" +
-        "🚀 How to start:\n" +
+        "?? Hi! I'm MafiaBot.\n" +
+        "?? How to start:\n" +
         "1) Add me to a channel: `/invite @MafiaBot`\n" +
         "2) Create a lobby: `@MafiaBot create` (or button)\n" +
         "3) Players join with `Join`, host starts with `Start`\n" +
-        "💡 If you have multiple games, include the channel in DM: `vote @user #channel`\n" +
-        "💬 DM: `whisper <text>` (once per day)\n" +
-        "🌐 Change language: `lang en` / `lang ru`.\n" +
-        "🔎 Use `Find games` to browse public lobbies.\n" +
-        "🗂️ Use `My channels` to edit your channel settings.\n" +
-        "❓ Use `FAQ` for common questions.",
+        "?? If you have multiple games, include the channel in DM: `vote @user #channel`\n" +
+        "?? DM: `whisper <text>` (once per day)\n" +
+        "?? Change language: `lang en` / `lang ru`.\n" +
+        "?? Use `Find games` to browse public lobbies.\n" +
+        "??? Use `My channels` to edit your channel settings.\n" +
+        "? Use `FAQ` for common questions.",
       help_add:
-        "➕ To add me to a channel:\n" +
+        "? To add me to a channel:\n" +
         "1) Open the channel\n" +
         "2) Type `/invite @MafiaBot`\n" +
         "Then create a lobby with `@MafiaBot create` or the button.",
       help_commands:
-        "📜 Channel commands:\n" +
+        "?? Channel commands:\n" +
         "- `@MafiaBot create` — create lobby\n" +
         "- `@MafiaBot join` / `leave`\n" +
         "- `@MafiaBot start` — start (host)\n" +
         "- `@MafiaBot extend 2` — extend lobby\n" +
         "- `@MafiaBot status`, `config`, `end`\n" +
-        "💬 DM: `whisper <text>` (once per day)\n" +
-        "🌐 Change language: `lang en` / `lang ru`.\n" +
-        "🔎 Find games: use the `Find games` button in DM.\n" +
-        "🗂️ My channels: `mychannels` in DM.\n" +
-        "🗂️ My channels: use the `My channels` button in DM.\n" +
-        "❓ FAQ: use the `FAQ` button in DM.",
+        "?? DM: `whisper <text>` (once per day)\n" +
+        "?? Change language: `lang en` / `lang ru`.\n" +
+        "?? Find games: use the `Find games` button in DM.\n" +
+        "??? My channels: `mychannels` in DM.\n" +
+        "??? My channels: use the `My channels` button in DM.\n" +
+        "? FAQ: use the `FAQ` button in DM.",
       help_settings:
-        "⚙️ Settings (lobby only):\n" +
+        "?? Settings (lobby only):\n" +
         "- `@MafiaBot config day 5`\n" +
         "- `@MafiaBot config night 2`\n" +
         "- `@MafiaBot config lobby 5`\n" +
         "- `@MafiaBot config min 4`\n" +
         "- `@MafiaBot config extend host|any`\n" +
-        "🌐 Change language: `lang en` / `lang ru`.\n" +
-        "🔎 Find games: use the `Find games` button in DM.\n" +
-        "🗂️ My channels: use the `My channels` button in DM.\n" +
-        "❓ FAQ: use the `FAQ` button in DM.",
+        "?? Change language: `lang en` / `lang ru`.\n" +
+        "?? Find games: use the `Find games` button in DM.\n" +
+        "??? My channels: use the `My channels` button in DM.\n" +
+        "? FAQ: use the `FAQ` button in DM.",
     },
     dev: {
       panel: {
-        title: "🛠️ Dev panel",
-        status_on: "🟢 Maintenance: ON",
-        status_off: "🔴 Maintenance: OFF",
-        button_enable: "🛠️ Enable maintenance",
-        button_disable: "🛠️ Disable maintenance",
+        title: "??? Dev panel",
+        status_on: "?? Maintenance: ON",
+        status_off: "?? Maintenance: OFF",
+        button_enable: "??? Enable maintenance",
+        button_disable: "??? Disable maintenance",
       },
-      not_authorized: "❌ You are not authorized to use developer commands.",
-      code_invalid: "❌ Invalid developer code.",
-      help: "🛠️ Dev: `dev <code>` • `test setup #channel Alice,Bob` • `as Alice vote Bob`",
+      not_authorized: "? You are not authorized to use developer commands.",
+      code_invalid: "? Invalid developer code.",
+      help: "??? Dev: `dev <code>` • `test setup #channel Alice,Bob` • `as Alice vote Bob`",
     },
     maintenance: {
-      reply: "⏳ MafiaBot is updating and will be back soon.",
-      blocked: "⚠️ MafiaBot is updating. New lobbies are temporarily disabled.",
-      lobby_closed: "⚠️ Lobby closed due to maintenance.",
-      done: "✅ All active games finished. You can update the bot now.",
+      reply: "? MafiaBot is updating and will be back soon.",
+      blocked: "?? MafiaBot is updating. New lobbies are temporarily disabled.",
+      lobby_closed: "?? Lobby closed due to maintenance.",
+      done: "? All active games finished. You can update the bot now.",
     },
     last_words: {
       prompt:
-        "🕯️ You are eliminated. Send one last message within 2 minutes. It will be posted in {channel}.",
-      received: "✅ Your last words were posted.",
-      expired: "⏳ Time is up. Last words were not sent.",
-      post: "🕯️ Last words from {name}: {text}",
+        "??? You are eliminated. Send one last message within 2 minutes. It will be posted in {channel}.",
+      received: "? Your last words were posted.",
+      expired: "? Time is up. Last words were not sent.",
+      post: "??? Last words from {name}: {text}",
     },
     dead: {
-      no_talk: "🚫 You are eliminated and cannot speak in this channel.",
-      message_deleted: "🚫 You are eliminated and cannot speak in this channel.",
+      no_talk: "?? You are eliminated and cannot speak in this channel.",
+      message_deleted: "?? You are eliminated and cannot speak in this channel.",
     },
     graveyard: {
       unavailable:
-        "⚠️ Graveyard channel is unavailable (missing permission to create/invite).",
+        "?? Graveyard channel is unavailable (missing permission to create/invite).",
     },
     mafia_room: {
-      intro: "🕶️ Mafia room created. Discuss here during the night.",
+      intro: "??? Mafia room created. Discuss here during the night.",
     },
     whisper: {
-      usage: "ℹ️ Usage: `whisper <text>`",
-      not_day: "⚠️ Whisper is only available during the day.",
-      disabled: "🚫 Whisper is disabled for this channel.",
-      already_used: "⚠️ You already used a whisper this day.",
-      sent: "✅ Your whisper was sent anonymously.",
-      post: "💬 Anonymous whisper: {text}",
+      usage: "?? Usage: `whisper <text>`",
+      not_day: "?? Whisper is only available during the day.",
+      disabled: "?? Whisper is disabled for this channel.",
+      already_used: "?? You already used a whisper this day.",
+      sent: "? Your whisper was sent anonymously.",
+      post: "?? Anonymous whisper: {text}",
     },
     lobby: {
-      title: "🧩 Mafia lobby",
-      host: "👑 Host: {host}",
-      players: "👥 Players: {count}/{min}",
-      ready: "✅ Ready: {ready}/{total}",
-      start_in: "⏳ Starts in: {time}",
+      title: "?? Mafia lobby",
+      host: "?? Host: {host}",
+      players: "?? Players: {count}/{min}",
+      ready: "? Ready: {ready}/{total}",
+      start_in: "? Starts in: {time}",
       created:
-        "🧩 Lobby created. Host: {host}. Join with `@MafiaBot join` or the button.",
-      joined: "➕ {user} joined. Players: {count}",
-      left: "➖ {user} left. Players: {count}",
-      empty_closed: "ℹ️ Lobby is empty. Game removed.",
+        "?? Lobby created. Host: {host}. Join with `@MafiaBot join` or the button.",
+      joined: "? {user} joined. Players: {count}",
+      left: "? {user} left. Players: {count}",
+      empty_closed: "?? Lobby is empty. Game removed.",
       closed_not_enough:
-        "⚠️ Lobby closed: need at least {min} players, now {count}.",
-      timeout_start: "⏳ Lobby time ended. Starting game!",
-      host_start: "▶️ Host started the game.",
-      ready_start: "✅ All players are ready. Starting game!",
-      extended: "⏳ Lobby extended by {minutes} min.",
-      closed: "❌ Lobby closed.",
-      starting: "▶️ Lobby closed. Game starting.",
-      end: "⏹️ Game ended.",
-      panel_summary: "🧩 Lobby players {count}/{min}.",
+        "?? Lobby closed: need at least {min} players, now {count}.",
+      timeout_start: "? Lobby time ended. Starting game!",
+      host_start: "?? Host started the game.",
+      ready_start: "? All players are ready. Starting game!",
+      extended: "? Lobby extended by {minutes} min.",
+      closed: "? Lobby closed.",
+      starting: "?? Lobby closed. Game starting.",
+      end: "?? Game ended.",
+      panel_summary: "?? Lobby players {count}/{min}.",
     },
     warn: {
-      day: "⚠️ Day ends in {seconds} sec.",
-      night: "⚠️ Night ends in {seconds} sec.",
-      lobby: "⚠️ Lobby auto-start in {seconds} sec.",
-      shortened_day: "⚡ Day shortened due to high activity.",
-      shortened_night: "⚡ Night shortened due to high activity.",
+      day: "?? Day ends in {seconds} sec.",
+      night: "?? Night ends in {seconds} sec.",
+      lobby: "?? Lobby auto-start in {seconds} sec.",
+      shortened_day: "? Day shortened due to high activity.",
+      shortened_night: "? Night shortened due to high activity.",
     },
     reminder: {
-      night_action: "night action 🌙",
-      vote: "vote 🗳️",
-      text: "🔔 Reminder: finish {action} for the game in {channel}.",
+      night_action: "night action ??",
+      vote: "vote ???",
+      text: "?? Reminder: finish {action} for the game in {channel}.",
     },
     phase: {
-      night_start: "🌙 Night {round}. The city falls asleep...",
-      day_start: "☀️ Day {round}. The city wakes up...",
+      night_start: "?? Night {round}. The city falls asleep...",
+      day_start: "?? Day {round}. The city wakes up...",
     },
     night: {
-      ended_killed: "🌙 Night is over. Killed: {targets}.",
-      ended_none: "🌙 Night is over. Nobody died.",
-      bodyguard: "🛡️ Bodyguard took the hit.",
+      ended_killed: "?? Night is over. Killed: {targets}.",
+      ended_none: "?? Night is over. Nobody died.",
+      bodyguard: "??? Bodyguard took the hit.",
     },
     day: {
-      ended_executed: "🗳️ Voting ended. Executed: {target} ({role}).",
-      ended_tie: "🗳️ Voting ended. Tie — nobody executed.",
+      ended_executed: "??? Voting ended. Executed: {target} ({role}).",
+      ended_tie: "??? Voting ended. Tie — nobody executed.",
     },
     auto: {
-      applied: "🤖 Auto actions applied.",
+      applied: "?? Auto actions applied.",
     },
     winner: {
-      mafia: "🏆 Mafia wins!",
-      town: "🏆 Town wins!",
-      jester: "🏆 Jester wins!",
+      mafia: "?? Mafia wins!",
+      town: "?? Town wins!",
+      jester: "?? Jester wins!",
       summary: "{winner}\nMafia: {mafia}\nTown: {town}",
       summary_jester: "{winner}\nJester: {jester}\nMafia: {mafia}\nTown: {town}",
     },
     prompt: {
-      mafia: "😈 Game in {channel}. Choose mafia target.",
-      doctor: "🧑‍⚕️ Game in {channel}. Who to save tonight?",
-      detective_mode: "🕵️ Choose your action for tonight:",
-      detective: "🕵️ Game in {channel}. Who to check?",
-      detective_kill: "🎯 Game in {channel}. Who to kill?",
-      bodyguard: "🛡️ Game in {channel}. Who to protect?",
-      bum: "🧴 Game in {channel}. Who to visit tonight?",
-      lawyer: "⚖️ Game in {channel}. Who to protect?",
-      stalker: "🎯 Contract: {role}. Choose your target.",
-      day: "🗳️ Game in {channel}. Your vote to eliminate.",
+      mafia: "?? Game in {channel}. Choose mafia target.",
+      doctor: "????? Game in {channel}. Who to save tonight?",
+      detective_mode: "??? Choose your action for tonight:",
+      detective: "??? Game in {channel}. Who to check?",
+      detective_kill: "?? Game in {channel}. Who to kill?",
+      bodyguard: "??? Game in {channel}. Who to protect?",
+      bum: "?? Game in {channel}. Who to visit tonight?",
+      lawyer: "?? Game in {channel}. Who to protect?",
+      stalker: "?? Contract: {role}. Choose your target.",
+      day: "??? Game in {channel}. Your vote to eliminate.",
     },
     select: {
-      player: "👤 Select a player",
-      target: "🎯 Select a target",
+      player: "?? Select a player",
+      target: "?? Select a target",
     },
     help: {
       commands:
-        "ℹ️ Commands: create, join, leave, start, status, end, config, extend. Voting and night actions are in DM.",
+        "?? Commands: create, join, leave, start, status, end, config, extend. Voting and night actions are in DM.",
     },
     config: {
       summary:
-        "⚙️ Settings: day={day}m, night={night}m, lobby={lobby}m, min={min}, extend={extend}",
+        "?? Settings: day={day}m, night={night}m, lobby={lobby}m, min={min}, extend={extend}",
     },
     status: {
-      text: "ℹ️ Status: {state}. Host: {host}. Alive: {alive}",
+      text: "?? Status: {state}. Host: {host}. Alive: {alive}",
     },
     state: {
-      lobby: "🧩 lobby",
-      day: "☀️ day",
-      night: "🌙 night",
-      ended: "🏁 ended",
+      lobby: "?? lobby",
+      day: "?? day",
+      night: "?? night",
+      ended: "?? ended",
     },
     err: {
-      channel_unknown: "❌ Could not determine channel.",
-      already_in_other: "❌ You are already in a lobby or game in {channel}.",
-      lobby_not_active: "⚠️ Lobby is not active.",
-      lobby_exists: "⚠️ A lobby already exists in this channel.",
-      lobby_none: "❌ No lobby right now. Create: @MafiaBot create",
-      already_in: "⚠️ You are already in the game.",
-      lobby_only: "❌ You can leave only in the lobby.",
-      not_in_lobby: "❌ You are not in the lobby.",
-      lobby_start_none: "⚠️ No active lobby to start.",
-      only_host_start: "❌ Only the host can start the game.",
-      need_min_players: "⚠️ Need at least {min} players.",
-      game_not_created: "❌ Game not created.",
-      config_lobby_only: "⚠️ Configuration is only available in the lobby.",
-      config_host_only: "❌ Only the host can configure the game.",
-      config_usage_extend: "ℹ️ Usage: @MafiaBot config extend host|any",
+      channel_unknown: "? Could not determine channel.",
+      already_in_other: "? You are already in a lobby or game in {channel}.",
+      lobby_not_active: "?? Lobby is not active.",
+      lobby_exists: "?? A lobby already exists in this channel.",
+      lobby_none: "? No lobby right now. Create: @MafiaBot create",
+      already_in: "?? You are already in the game.",
+      lobby_only: "? You can leave only in the lobby.",
+      not_in_lobby: "? You are not in the lobby.",
+      lobby_start_none: "?? No active lobby to start.",
+      only_host_start: "? Only the host can start the game.",
+      need_min_players: "?? Need at least {min} players.",
+      game_not_created: "? Game not created.",
+      config_lobby_only: "?? Configuration is only available in the lobby.",
+      config_host_only: "? Only the host can configure the game.",
+      config_usage_extend: "?? Usage: @MafiaBot config extend host|any",
       config_usage_numbers:
-        "ℹ️ Usage: @MafiaBot config day 5 | night 2 | lobby 5 | min 4",
-      config_options: "ℹ️ Available settings: day, night, lobby, min, extend",
-      extend_lobby_only: "⚠️ You can extend only in the lobby.",
-      extend_not_allowed: "❌ Only the host or an allowed participant can extend.",
-      no_active_game: "⚠️ No active game.",
-      only_host_end: "❌ Only the host can end the game.",
-      unknown_command: "❌ Unknown command. Type @MafiaBot help",
+        "?? Usage: @MafiaBot config day 5 | night 2 | lobby 5 | min 4",
+      config_options: "?? Available settings: day, night, lobby, min, extend",
+      extend_lobby_only: "?? You can extend only in the lobby.",
+      extend_not_allowed: "? Only the host or an allowed participant can extend.",
+      no_active_game: "?? No active game.",
+      only_host_end: "? Only the host can end the game.",
+      unknown_command: "? Unknown command. Type @MafiaBot help",
     },
     ok: {
-      settings_updated: "✅ Settings updated.",
+      settings_updated: "? Settings updated.",
     },
     action: {
-      role_dm: "🎭 Your role in the game {channel}: *{role}*.",
-      failed: "❌ Failed to process selection.",
-      game_ended: "⚠️ Game already ended.",
-      not_in_game: "❌ You are not in the game or you are eliminated.",
-      not_day: "⚠️ It is not day now.",
-      choose_alive: "ℹ️ Choose a living player.",
-      already_acted: "⚠️ You already acted this phase.",
-      already_voted: "⚠️ Your vote is already locked.",
-      vote_recorded: "✅ Your vote recorded: {target}.",
-      vote_abstain: "✅ You abstained.",
-      not_night: "⚠️ It is not night now.",
-      mafia_only: "❌ Only mafia can do that.",
-      no_mafia_target: "⚠️ You cannot choose mafia.",
-      choice_recorded: "✅ Your choice: {target}.",
-      no_kill: "✅ Your choice: no kill.",
-      doctor_only: "❌ Only the doctor can do that.",
-      detective_only: "❌ Only the detective can do that.",
-      bodyguard_only: "❌ Only the bodyguard can do that.",
-      bum_only: "❌ Only the Bum can do that.",
-      lawyer_only: "❌ Only the Lawyer can do that.",
-      stalker_only: "❌ Only the Stalker can do that.",
-      doctor_self_save_limit: "⚠️ You can only save yourself once per game.",
-      doctor_save: "✅ You save: {target}.",
-      detective_check: "✅ You check: {target}.",
-      detective_kill: "✅ You kill: {target}.",
-      detective_result: "ℹ️ Check result: {target} is {result}.",
-      bodyguard_protect: "✅ You protect: {target}.",
-      bum_visit: "✅ You visit: {target}.",
-      lawyer_protect: "✅ You protect: {target}.",
-      stalker_kill: "✅ You hunt: {target}.",
-      result_mafia: "😈 mafia",
-      result_not_mafia: "👤 not mafia",
+      role_dm: "?? Your role in the game {channel}: *{role}*.",
+      failed: "? Failed to process selection.",
+      game_ended: "?? Game already ended.",
+      not_in_game: "? You are not in the game or you are eliminated.",
+      not_day: "?? It is not day now.",
+      choose_alive: "?? Choose a living player.",
+      already_acted: "?? You already acted this phase.",
+      already_voted: "?? Your vote is already locked.",
+      vote_recorded: "? Your vote recorded: {target}.",
+      vote_abstain: "? You abstained.",
+      not_night: "?? It is not night now.",
+      mafia_only: "? Only mafia can do that.",
+      no_mafia_target: "?? You cannot choose mafia.",
+      choice_recorded: "? Your choice: {target}.",
+      no_kill: "? Your choice: no kill.",
+      doctor_only: "? Only the doctor can do that.",
+      detective_only: "? Only the detective can do that.",
+      bodyguard_only: "? Only the bodyguard can do that.",
+      bum_only: "? Only the Bum can do that.",
+      lawyer_only: "? Only the Lawyer can do that.",
+      stalker_only: "? Only the Stalker can do that.",
+      doctor_self_save_limit: "?? You can only save yourself once per game.",
+      doctor_save: "? You save: {target}.",
+      detective_check: "? You check: {target}.",
+      detective_kill: "? You kill: {target}.",
+      detective_result: "?? Check result: {target} is {result}.",
+      bodyguard_protect: "? You protect: {target}.",
+      bum_visit: "? You visit: {target}.",
+      lawyer_protect: "? You protect: {target}.",
+      stalker_kill: "? You hunt: {target}.",
+      result_mafia: "?? mafia",
+      result_not_mafia: "?? not mafia",
     },
     bum: {
-      witness: "🧴 You witnessed a murder: {killer} killed {victim}.",
-      nothing: "🧴 You saw nothing tonight.",
+      witness: "?? You witnessed a murder: {killer} killed {victim}.",
+      nothing: "?? You saw nothing tonight.",
     },
     stalker: {
-      target_assigned: "🎯 Your contract role: {role}.",
-      success: "🏆 Contract completed! Wins: {wins}. New target: {role}.",
-      failed: "⚠️ Contract failed. New target: {role}.",
-      no_targets: "⚠️ No available roles to target right now.",
+      target_assigned: "?? Your contract role: {role}.",
+      success: "?? Contract completed! Wins: {wins}. New target: {role}.",
+      failed: "?? Contract failed. New target: {role}.",
+      no_targets: "?? No available roles to target right now.",
     },
     sergeant: {
-      promoted: "🎖️ The Detective is dead. You take over their actions.",
-      info: "🎖️ Detective result: {target} is {result}.",
+      promoted: "??? The Detective is dead. You take over their actions.",
+      info: "??? Detective result: {target} is {result}.",
     },
     dm_cmd: {
-      no_game: "⚠️ No active game for this command.",
-      need_alive: "ℹ️ You must mention a living player.",
-      day_only: "⚠️ Day actions are only available during the day.",
-      night_only: "⚠️ Night actions are only available at night.",
-      mafia_only: "❌ Only mafia can do that.",
-      no_mafia_target: "⚠️ You cannot choose mafia.",
-      abstain_disabled: "🚫 Abstain is disabled in this channel.",
-      no_kill_disabled: "🚫 No‑kill is disabled in this channel.",
-      doctor_only: "❌ Only the doctor can do that.",
-      detective_only: "❌ Only the detective can do that.",
-      bodyguard_only: "❌ Only the bodyguard can do that.",
-      bum_only: "❌ Only the Bum can do that.",
-      lawyer_only: "❌ Only the Lawyer can do that.",
-      stalker_only: "❌ Only the Stalker can do that.",
-      doctor_self_save_limit: "⚠️ You can only save yourself once per game.",
-      vote_recorded: "✅ Your vote recorded: {target}.",
-      choice_recorded: "✅ Your choice: {target}.",
-      doctor_save: "✅ You save: {target}.",
-      detective_check: "✅ You check: {target}.",
-      detective_kill: "✅ You kill: {target}.",
-      detective_result: "ℹ️ Check result: {target} is {result}.",
-      result_mafia: "😈 mafia",
-      result_not_mafia: "👤 not mafia",
-      bodyguard_protect: "✅ You protect: {target}.",
-      bum_visit: "✅ You visit: {target}.",
-      lawyer_protect: "✅ You protect: {target}.",
-      stalker_kill: "✅ You hunt: {target}.",
+      no_game: "?? No active game for this command.",
+      need_alive: "?? You must mention a living player.",
+      day_only: "?? Day actions are only available during the day.",
+      night_only: "?? Night actions are only available at night.",
+      mafia_only: "? Only mafia can do that.",
+      no_mafia_target: "?? You cannot choose mafia.",
+      abstain_disabled: "?? Abstain is disabled in this channel.",
+      no_kill_disabled: "?? No?kill is disabled in this channel.",
+      doctor_only: "? Only the doctor can do that.",
+      detective_only: "? Only the detective can do that.",
+      bodyguard_only: "? Only the bodyguard can do that.",
+      bum_only: "? Only the Bum can do that.",
+      lawyer_only: "? Only the Lawyer can do that.",
+      stalker_only: "? Only the Stalker can do that.",
+      doctor_self_save_limit: "?? You can only save yourself once per game.",
+      vote_recorded: "? Your vote recorded: {target}.",
+      choice_recorded: "? Your choice: {target}.",
+      doctor_save: "? You save: {target}.",
+      detective_check: "? You check: {target}.",
+      detective_kill: "? You kill: {target}.",
+      detective_result: "?? Check result: {target} is {result}.",
+      result_mafia: "?? mafia",
+      result_not_mafia: "?? not mafia",
+      bodyguard_protect: "? You protect: {target}.",
+      bum_visit: "? You visit: {target}.",
+      lawyer_protect: "? You protect: {target}.",
+      stalker_kill: "? You hunt: {target}.",
       unknown_command:
-        "❌ Unknown command. Use kill/save/check/protect/visit/defend/stalk @user.",
+        "? Unknown command. Use kill/save/check/protect/visit/defend/stalk @user.",
     },
     test: {
-      not_dev: "❌ Only the developer can use test commands.",
-      setup_usage: "ℹ️ Usage: `test setup #channel Alice,Bob,Charlie`",
-      list_usage: "ℹ️ Usage: `test list #channel`",
+      not_dev: "? Only the developer can use test commands.",
+      setup_usage: "?? Usage: `test setup #channel Alice,Bob,Charlie`",
+      list_usage: "?? Usage: `test list #channel`",
       setup_ok:
-        "✅ 🧪 Test lobby ready in {channel}. Players: {players}\nUse: `as <name> <action>`.",
-      duplicate_names: "❌ Duplicate test names: {names}.",
-      active_game: "⚠️ Can't setup test mode during an active game.",
-      real_players: "⚠️ Remove real players from the lobby before using test mode.",
-      no_game: "⚠️ No test game found. Use `test setup` or specify #channel.",
-      list: "🧪 Test players in {channel}: {players}",
-      as_usage: "ℹ️ Usage: `as <name> <action> [target]`",
-      actor_not_found: "❌ Test player `{name}` not found.",
-      target_not_found: "❌ Target not found: `{name}`.",
-      roles_summary: "🧪 *Test roles* in {channel}:\n{list}",
+        "? ?? Test lobby ready in {channel}. Players: {players}\nUse: `as <name> <action>`.",
+      duplicate_names: "? Duplicate test names: {names}.",
+      active_game: "?? Can't setup test mode during an active game.",
+      real_players: "?? Remove real players from the lobby before using test mode.",
+      no_game: "?? No test game found. Use `test setup` or specify #channel.",
+      list: "?? Test players in {channel}: {players}",
+      as_usage: "?? Usage: `as <name> <action> [target]`",
+      actor_not_found: "? Test player `{name}` not found.",
+      target_not_found: "? Target not found: `{name}`.",
+      roles_summary: "?? *Test roles* in {channel}:\n{list}",
       actions_reminder_night:
-        "🌙 *Test actions (night)* in {channel}:\n{list}\nUse: `as <name> <action> <target>`",
+        "?? *Test actions (night)* in {channel}:\n{list}\nUse: `as <name> <action> <target>`",
       actions_reminder_day:
-        "☀️ *Test actions (day)* in {channel}:\n{list}\nUse: `as <name> vote <target>` or `as <name> abstain`",
+        "?? *Test actions (day)* in {channel}:\n{list}\nUse: `as <name> vote <target>` or `as <name> abstain`",
     },
   },
   ru: {
     role: {
-      mafia: "😈 Мафия",
-      doctor: "🧑‍⚕️ Доктор",
-      detective: "🕵️ Детектив",
-      mayor: "🎩 Мэр",
-      bodyguard: "🛡️ Телохранитель",
-      town: "👤 Мирный",
-      jester: "🤡 Шут",
-      godfather: "🕴️ Крёстный отец",
-      lucky: "🍀 Счастливчик",
-      bum: "🧴 Бомж",
-      sergeant: "🎖️ Сержант",
-      lawyer: "⚖️ Адвокат",
-      stalker: "🎯 Сталкер",
+      mafia: "?? Мафия",
+      doctor: "????? Доктор",
+      detective: "??? Детектив",
+      mayor: "?? Мэр",
+      bodyguard: "??? Телохранитель",
+      town: "?? Мирный",
+      jester: "?? Шут",
+      godfather: "??? Крёстный отец",
+      lucky: "?? Счастливчик",
+      bum: "?? Бомж",
+      sergeant: "??? Сержант",
+      lawyer: "?? Адвокат",
+      stalker: "?? Сталкер",
     },
     role_help: {
       mafia:
-        "😈 Ты — Мафия. Ночью выбирайте цель и добейтесь паритета с городом.",
+        "?? Ты — Мафия. Ночью выбирайте цель и добейтесь паритета с городом.",
       godfather:
-        "🕴️ Ты — Крёстный отец. Ты мафия, но Детектив видит тебя как мирного.",
+        "??? Ты — Крёстный отец. Ты мафия, но Детектив видит тебя как мирного.",
       doctor:
-        "🧑‍⚕️ Ты — Доктор. Ночью выбираешь кого спасти (включая себя в пределах лимита).",
+        "????? Ты — Доктор. Ночью выбираешь кого спасти (включая себя в пределах лимита).",
       detective:
-        "🕵️ Ты — Детектив. Ночью можешь либо проверить игрока, либо убить цель (только одно действие).",
+        "??? Ты — Детектив. Ночью можешь либо проверить игрока, либо убить цель (только одно действие).",
       mayor:
-        "🎩 Ты — Мэр. Твой дневной голос считается за 2.",
+        "?? Ты — Мэр. Твой дневной голос считается за 2.",
       bodyguard:
-        "🛡️ Ты — Телохранитель. Защищай цель; если мафия атакует её, ты принимаешь удар.",
+        "??? Ты — Телохранитель. Защищай цель; если мафия атакует её, ты принимаешь удар.",
       jester:
-        "🤡 Ты — Шут. Если тебя казнят голосованием — ты выигрываешь мгновенно.",
+        "?? Ты — Шут. Если тебя казнят голосованием — ты выигрываешь мгновенно.",
       town:
-        "👤 Ты — Мирный житель. Найди мафию и казни её днём.",
+        "?? Ты — Мирный житель. Найди мафию и казни её днём.",
       lucky:
-        "🍀 Ты — Счастливчик. Каждую ночь у тебя 50% шанс выжить при убийстве.",
+        "?? Ты — Счастливчик. Каждую ночь у тебя 50% шанс выжить при убийстве.",
       bum:
-        "🧴 Ты — Бомж. Ночью заходишь к игроку; если его убьют, ты увидишь убийцу.",
+        "?? Ты — Бомж. Ночью заходишь к игроку; если его убьют, ты увидишь убийцу.",
       sergeant:
-        "🎖️ Ты — Сержант. Детектив делится с тобой результатами. Если детектив погибнет, ты получишь его действия.",
+        "??? Ты — Сержант. Детектив делится с тобой результатами. Если детектив погибнет, ты получишь его действия.",
       lawyer:
-        "⚖️ Ты — Адвокат. Ночью защищаешь игрока; если защищаешь мафию, детектив видит её как мирную. Твоя цель — победа мафии.",
+        "?? Ты — Адвокат. Ночью защищаешь игрока; если защищаешь мафию, детектив видит её как мирную. Твоя цель — победа мафии.",
       stalker:
-        "🎯 Ты — Сталкер. У тебя контракт на роль. Убей цель лично, чтобы получить победу.",
+        "?? Ты — Сталкер. У тебя контракт на роль. Убей цель лично, чтобы получить победу.",
     },
     time: {
       sec: "{seconds} сек.",
@@ -720,83 +720,83 @@ const I18N = {
       min_sec: "{minutes} мин {seconds} сек.",
     },
     button: {
-      join: "➕ Войти",
-      leave: "➖ Выйти",
-      start: "▶️ Старт",
-      extend: "⏳ Продлить +2м",
-      end: "⏹️ Завершить",
-      ready: "✅ Готов",
-      abstain: "🤐 Воздержаться",
-      no_kill: "🛑 Не убивать",
-      role_help: "ℹ️ Что делать?",
-      detective_check: "🔍 Проверить",
-      detective_kill: "🎯 Убить",
-      prev: "◀️ Назад",
-      next: "▶️ Вперёд",
-      page: "📄 Стр. {page}/{total}",
-      help_add: "➕ Как добавить бота",
-      help_commands: "📜 Команды",
-      help_settings: "⚙️ Настройки",
-      find_games: "🔎 Найти игры",
-      my_channels: "🗂️ Мои каналы",
-      faq: "❓ FAQ",
-      back: "⬅️ Назад",
-      public: "🌐 Публичный",
-      private: "🔒 Частный",
-      filter_active: "🟢 Активные",
-      filter_recruiting: "🟡 В наборе",
-      filter_inactive: "⚪ Не активные",
-      filter_lang_all: "🌍 Все",
-      filter_lang_en: "🇬🇧 ENG",
-      filter_lang_ru: "🇷🇺 RU",
-      lang_en: "🇬🇧 English",
-      lang_ru: "🇷🇺 Русский",
+      join: "? Войти",
+      leave: "? Выйти",
+      start: "?? Старт",
+      extend: "? Продлить +2м",
+      end: "?? Завершить",
+      ready: "? Готов",
+      abstain: "?? Воздержаться",
+      no_kill: "?? Не убивать",
+      role_help: "?? Что делать?",
+      detective_check: "?? Проверить",
+      detective_kill: "?? Убить",
+      prev: "?? Назад",
+      next: "?? Вперёд",
+      page: "?? Стр. {page}/{total}",
+      help_add: "? Как добавить бота",
+      help_commands: "?? Команды",
+      help_settings: "?? Настройки",
+      find_games: "?? Найти игры",
+      my_channels: "??? Мои каналы",
+      faq: "? FAQ",
+      back: "?? Назад",
+      public: "?? Публичный",
+      private: "?? Частный",
+      filter_active: "?? Активные",
+      filter_recruiting: "?? В наборе",
+      filter_inactive: "? Не активные",
+      filter_lang_all: "?? Все",
+      filter_lang_en: "???? ENG",
+      filter_lang_ru: "???? RU",
+      lang_en: "???? English",
+      lang_ru: "???? Русский",
     },
     dashboard: {
-      title: "🧭 Панель игры",
-      phase: "🧭 Фаза: {phase}",
-      timer: "⏳ Таймер: {time}",
-      alive: "🧍 Живые ({count}): {list}",
-      ready: "✅ Готовы: {ready}/{total}",
+      title: "?? Панель игры",
+      phase: "?? Фаза: {phase}",
+      timer: "? Таймер: {time}",
+      alive: "?? Живые ({count}): {list}",
+      ready: "? Готовы: {ready}/{total}",
     },
     home: {
-      title: "🏠 MafiaBot",
-      tagline: "🎮 Ваш центр управления мафией в Slack. (Разработчик: @bob)",
+      title: "?? MafiaBot",
+      tagline: "?? Ваш центр управления мафией в Slack. (Разработчик: @bob)",
       quickstart:
-        "*🚀 Быстрый старт*\n" +
-        "1️⃣ Добавьте меня в канал: `/invite @MafiaBot`\n" +
-        "2️⃣ Создайте лобби: `@MafiaBot create`\n" +
-        "3️⃣ Игроки жмут `Join`, хост жмёт `Start` или все `Ready`",
+        "*?? Быстрый старт*\n" +
+        "1?? Добавьте меня в канал: `/invite @MafiaBot`\n" +
+        "2?? Создайте лобби: `@MafiaBot create`\n" +
+        "3?? Игроки жмут `Join`, хост жмёт `Start` или все `Ready`",
       controls:
-        "*🧩 Управление лобби*\n" +
+        "*?? Управление лобби*\n" +
         "- Кнопки: `Join`, `Leave`, `Ready`, `Start`, `Extend`, `End`\n" +
         "- Команды: `@MafiaBot join`, `leave`, `start`, `extend 2`, `status`, `config`",
       gameplay:
-        "*🌙 Во время игры*\n" +
+        "*?? Во время игры*\n" +
         "- Ночные действия и дневное голосование приходят в личку\n" +
         "- `whisper <текст>` в личке раз в день\n" +
         "- После смерти есть «последние слова» в личке",
       features:
-        "*✨ Возможности*\n" +
+        "*? Возможности*\n" +
         "- Роли: Мафия, Доктор, Детектив, Мэр, Телохранитель, Шут, Крёстный отец, Счастливчик, Бомж, Сержант, Адвокат, Сталкер\n" +
-        "- Анонимные голосования, авто‑таймеры, сохранение в SQLite\n" +
+        "- Анонимные голосования, авто?таймеры, сохранение в SQLite\n" +
         "- Комната мафии + кладбище (если есть права)",
       tips:
-        "*💡 Подсказки*\n" +
+        "*?? Подсказки*\n" +
         "- Если несколько игр, указывайте `#channel` в личных командах\n" +
         "- Смена языка в личке: `lang en` / `lang ru`\n" +
         "- Редактирование настроек: `Мои каналы` в личке\n" +
         "- Открыть FAQ: `FAQ` в личке",
-      stats_title: "📊 Ваша статистика",
+      stats_title: "?? Ваша статистика",
       stats_line:
         "Игры: {games} • Победы: {wins} • Поражения: {losses} • Винрейт: {rate}%",
-      channel_stats_title: "🧩 В этом канале",
+      channel_stats_title: "?? В этом канале",
       channel_stats_line:
         "Игры: {games} • Победы: {wins} • Поражения: {losses} • Винрейт: {rate}%",
-      role_stats_title: "🎭 Статистика по ролям",
-      role_stats_empty: "ℹ️ Пока нет статистики по ролям.",
-      current_title: "🕹️ Текущая игра",
-      current_none: "ℹ️ Активной игры нет.",
+      role_stats_title: "?? Статистика по ролям",
+      role_stats_empty: "?? Пока нет статистики по ролям.",
+      current_title: "??? Текущая игра",
+      current_none: "?? Активной игры нет.",
       current_line:
         "Канал: {channel}\n" +
         "Фаза: {phase}\n" +
@@ -804,403 +804,403 @@ const I18N = {
         "Живые: {alive}\n" +
         "Вы: {status}\n" +
         "Роль: {role}",
-      status_alive: "✅ Жив",
-      status_dead: "❌ Выбыли",
-      role_unknown: "ℹ️ Неизвестно",
-      history_title: "🌙 Последние 3 ночи",
-      history_empty: "ℹ️ Пока нет итогов ночи.",
-      history_line: "🌙 Ночь {round}: {text}",
+      status_alive: "? Жив",
+      status_dead: "? Выбыли",
+      role_unknown: "?? Неизвестно",
+      history_title: "?? Последние 3 ночи",
+      history_empty: "?? Пока нет итогов ночи.",
+      history_line: "?? Ночь {round}: {text}",
     },
     find: {
-      prompt_public: "ℹ️ Сделать {channel} публичным в «Найти игры»?",
-      set_public: "✅ {channel} теперь публичный в «Найти игры».",
-      set_private: "ℹ️ {channel} приватный и не будет отображаться.",
+      prompt_public: "?? Сделать {channel} публичным в «Найти игры»?",
+      set_public: "? {channel} теперь публичный в «Найти игры».",
+      set_private: "?? {channel} приватный и не будет отображаться.",
       private_not_allowed:
-        "❌ Приватные каналы нельзя показывать в «Найти игры».",
-      title: "🔎 Найти игры",
-      empty: "ℹ️ Нет каналов для этого фильтра.",
-      status_active: "🟢 Активна — {phase} {round} • Живых {alive}",
-      status_recruiting: "🟡 В наборе — {count}/{min}, старт через {time}",
-      status_inactive: "⚪ Не активна — игра не идёт",
-      filters: "🎛️ Фильтр:",
-      filter_lang: "🌐 Язык:",
-      lang_label_en: "🇬🇧 ENG",
-      lang_label_ru: "🇷🇺 RU",
+        "? Приватные каналы нельзя показывать в «Найти игры».",
+      title: "?? Найти игры",
+      empty: "?? Нет каналов для этого фильтра.",
+      status_active: "?? Активна — {phase} {round} • Живых {alive}",
+      status_recruiting: "?? В наборе — {count}/{min}, старт через {time}",
+      status_inactive: "? Не активна — игра не идёт",
+      filters: "??? Фильтр:",
+      filter_lang: "?? Язык:",
+      lang_label_en: "???? ENG",
+      lang_label_ru: "???? RU",
     },
     faq: {
-      title: "❓ FAQ",
+      title: "? FAQ",
       intro:
-        "ℹ️ Выберите вопрос ниже. Можно написать в личку `faq <id>`, чтобы открыть конкретный ответ.",
-      id_label: "🔗 FAQ ID: `faq {id}`",
-      not_found: "⚠️ Вопрос не найден. Открываю список FAQ.",
-      command_open: "❓ Открыть FAQ:",
-      command_detail: "❓ Открыть вопрос FAQ `{id}`:",
-      open_button: "❓ Открыть FAQ",
+        "?? Выберите вопрос ниже. Можно написать в личку `faq <id>`, чтобы открыть конкретный ответ.",
+      id_label: "?? FAQ ID: `faq {id}`",
+      not_found: "?? Вопрос не найден. Открываю список FAQ.",
+      command_open: "? Открыть FAQ:",
+      command_detail: "? Открыть вопрос FAQ `{id}`:",
+      open_button: "? Открыть FAQ",
     },
     my_channels: {
-      title: "🗂️ Мои каналы",
-      empty: "ℹ️ Пока нет каналов.",
-      status_public: "🌐 Публичный",
-      status_private: "🔒 Частный",
-      not_owner: "❌ Вы не владелец этого канала.",
-      saved: "✅ Настройки канала сохранены.",
-      edit_intro: "⚙️ Настройка {channel}",
+      title: "??? Мои каналы",
+      empty: "?? Пока нет каналов.",
+      status_public: "?? Публичный",
+      status_private: "?? Частный",
+      not_owner: "? Вы не владелец этого канала.",
+      saved: "? Настройки канала сохранены.",
+      edit_intro: "?? Настройка {channel}",
     },
     settings: {
-      title: "⚙️ Настройки канала",
-      privacy_label: "🔎 Видимость в «Найти игры»",
-      privacy_public: "🌐 Публичный",
-      privacy_private: "🔒 Частный",
-      channel_lang: "🌐 Язык канала",
+      title: "?? Настройки канала",
+      privacy_label: "?? Видимость в «Найти игры»",
+      privacy_public: "?? Публичный",
+      privacy_private: "?? Частный",
+      channel_lang: "?? Язык канала",
       channel_lang_en: "English (ENG)",
       channel_lang_ru: "Русский (RU)",
-      day_minutes: "☀️ День (мин.)",
-      night_minutes: "🌙 Ночь (мин.)",
-      lobby_minutes: "🧩 Лобби (мин.)",
-      min_players: "👥 Минимум игроков",
-      extend_policy: "🧩 Кто может продлевать?",
-      extend_host: "👑 Только хост",
-      extend_any: "👥 Все",
-      warning_1: "⚠️ Предупреждение #1 (сек.)",
-      warning_2: "⚠️ Предупреждение #2 (сек.)",
-      auto_shorten: "⏱️ Автосокращение фазы",
-      whisper_enabled: "💬 Шёпот включён",
-      allow_abstain: "🤐 Разрешить воздержание",
-      allow_no_kill: "🛑 Разрешить «без убийства»",
-      doctor_self_save: "🧑‍⚕️ Лимит self‑save",
-      toggle_on: "✅ Вкл",
-      toggle_off: "❌ Выкл",
-      submit: "✅ Сохранить",
-      cancel: "❌ Отмена",
-      invalid_number: "⚠️ Введите корректное число.",
-      invalid_min_players: "⚠️ Минимум игроков должен быть >= 4.",
-      invalid_warning: "⚠️ Предупреждения должны быть > 0.",
-      invalid_self_save: "⚠️ Лимит self‑save должен быть >= 0.",
+      day_minutes: "?? День (мин.)",
+      night_minutes: "?? Ночь (мин.)",
+      lobby_minutes: "?? Лобби (мин.)",
+      min_players: "?? Минимум игроков",
+      extend_policy: "?? Кто может продлевать?",
+      extend_host: "?? Только хост",
+      extend_any: "?? Все",
+      warning_1: "?? Предупреждение #1 (сек.)",
+      warning_2: "?? Предупреждение #2 (сек.)",
+      auto_shorten: "?? Автосокращение фазы",
+      whisper_enabled: "?? Шёпот включён",
+      allow_abstain: "?? Разрешить воздержание",
+      allow_no_kill: "?? Разрешить «без убийства»",
+      doctor_self_save: "????? Лимит self?save",
+      toggle_on: "? Вкл",
+      toggle_off: "? Выкл",
+      submit: "? Сохранить",
+      cancel: "? Отмена",
+      invalid_number: "?? Введите корректное число.",
+      invalid_min_players: "?? Минимум игроков должен быть >= 4.",
+      invalid_warning: "?? Предупреждения должны быть > 0.",
+      invalid_self_save: "?? Лимит self?save должен быть >= 0.",
     },
     dm: {
       lang_prompt:
-        "🌐 Выберите язык кнопками ниже. Позже можно изменить командой `lang en` / `lang ru`.",
-      lang_set_en: "✅ Language set to English.",
-      lang_set_ru: "✅ Язык установлен: русский.",
-      lang_usage: "ℹ️ Использование: `lang en` или `lang ru`.",
+        "?? Выберите язык кнопками ниже. Позже можно изменить командой `lang en` / `lang ru`.",
+      lang_set_en: "? Language set to English.",
+      lang_set_ru: "? Язык установлен: русский.",
+      lang_usage: "?? Использование: `lang en` или `lang ru`.",
       lang_change_command:
-        "ℹ️ Язык уже установлен. Измените его командой `lang en` / `lang ru`.",
+        "?? Язык уже установлен. Измените его командой `lang en` / `lang ru`.",
       help_intro_tg:
-        "👋 Привет! Я MafiaBot для Telegram.\n" +
-        "🚀 Как начать:\n" +
+        "?? Привет! Я MafiaBot для Telegram.\n" +
+        "?? Как начать:\n" +
         "1) Добавьте меня в группу\n" +
         "2) В группе: `/create` чтобы открыть лобби\n" +
         "3) Игроки `/join`, хост `/start`\n" +
-        "💬 Ночные/дневные действия приходят сюда кнопками",
+        "?? Ночные/дневные действия приходят сюда кнопками",
       help_add_tg:
-        "➕ Добавьте меня в Telegram‑группу. По желанию дайте админ‑права, чтобы удалять сообщения выбывших.",
+        "? Добавьте меня в Telegram?группу. По желанию дайте админ?права, чтобы удалять сообщения выбывших.",
       help_commands_tg:
-        "📜 Команды в группе: `/create`, `/join`, `/leave`, `/start`, `/extend 2`, `/status`, `/config`, `/end`",
+        "?? Команды в группе: `/create`, `/join`, `/leave`, `/start`, `/extend 2`, `/status`, `/config`, `/end`",
       help_settings_tg:
-        "⚙️ Настройки: `/config` в группе и `/mychannels` в личке для дефолтных параметров.",
+        "?? Настройки: `/config` в группе и `/mychannels` в личке для дефолтных параметров.",
       help_intro:
-        "👋 Привет! Я MafiaBot.\n" +
-        "🚀 Как начать:\n" +
+        "?? Привет! Я MafiaBot.\n" +
+        "?? Как начать:\n" +
         "1) Добавьте меня в нужный канал: `/invite @MafiaBot`\n" +
         "2) В канале создайте лобби: `@MafiaBot create` (или кнопка)\n" +
         "3) Игроки заходят через `Join`, хост запускает `Start`\n" +
-        "💡 Если у вас несколько игр, указывайте канал в личке: `vote @user #channel`\n" +
-        "💬 Личка: `whisper <текст>` (раз в день)\n" +
-        "🌐 Смена языка: `lang en` / `lang ru`.\n" +
-        "🔎 Поиск игр: кнопка `Найти игры` в личке.\n" +
-        "🗂️ Кнопка `Мои каналы` — редактирование настроек.\n" +
-        "❓ Кнопка `FAQ` — ответы на частые вопросы.",
+        "?? Если у вас несколько игр, указывайте канал в личке: `vote @user #channel`\n" +
+        "?? Личка: `whisper <текст>` (раз в день)\n" +
+        "?? Смена языка: `lang en` / `lang ru`.\n" +
+        "?? Поиск игр: кнопка `Найти игры` в личке.\n" +
+        "??? Кнопка `Мои каналы` — редактирование настроек.\n" +
+        "? Кнопка `FAQ` — ответы на частые вопросы.",
       help_add:
-        "➕ Чтобы добавить меня в канал:\n" +
+        "? Чтобы добавить меня в канал:\n" +
         "1) Откройте нужный канал\n" +
         "2) Напишите `/invite @MafiaBot`\n" +
         "Далее создайте лобби командой `@MafiaBot create` или кнопкой.",
       help_commands:
-        "📜 Команды в канале:\n" +
+        "?? Команды в канале:\n" +
         "- `@MafiaBot create` — создать лобби\n" +
         "- `@MafiaBot join` / `leave`\n" +
         "- `@MafiaBot start` — старт (хост)\n" +
         "- `@MafiaBot extend 2` — продлить лобби\n" +
         "- `@MafiaBot status`, `config`, `end`\n" +
-        "💬 Личка: `whisper <текст>` (раз в день)\n" +
-        "🌐 Смена языка: `lang en` / `lang ru`.\n" +
-        "🔎 Поиск игр: кнопка `Найти игры` в личке.\n" +
-        "🗂️ Мои каналы: `mychannels` в личке.\n" +
-        "🗂️ Кнопка `Мои каналы` — редактирование настроек.\n" +
-        "❓ Кнопка `FAQ` — ответы на частые вопросы.",
+        "?? Личка: `whisper <текст>` (раз в день)\n" +
+        "?? Смена языка: `lang en` / `lang ru`.\n" +
+        "?? Поиск игр: кнопка `Найти игры` в личке.\n" +
+        "??? Мои каналы: `mychannels` в личке.\n" +
+        "??? Кнопка `Мои каналы` — редактирование настроек.\n" +
+        "? Кнопка `FAQ` — ответы на частые вопросы.",
       help_settings:
-        "⚙️ Настройки (только в лобби):\n" +
+        "?? Настройки (только в лобби):\n" +
         "- `@MafiaBot config day 5`\n" +
         "- `@MafiaBot config night 2`\n" +
         "- `@MafiaBot config lobby 5`\n" +
         "- `@MafiaBot config min 4`\n" +
         "- `@MafiaBot config extend host|any`\n" +
-        "🌐 Смена языка: `lang en` / `lang ru`.\n" +
-        "🔎 Поиск игр: кнопка `Найти игры` в личке.\n" +
-        "🗂️ Кнопка `Мои каналы` — редактирование настроек.\n" +
-        "❓ Кнопка `FAQ` — ответы на частые вопросы.",
+        "?? Смена языка: `lang en` / `lang ru`.\n" +
+        "?? Поиск игр: кнопка `Найти игры` в личке.\n" +
+        "??? Кнопка `Мои каналы` — редактирование настроек.\n" +
+        "? Кнопка `FAQ` — ответы на частые вопросы.",
     },
     dev: {
       panel: {
-        title: "🛠️ Панель разработчика",
-        status_on: "🟢 Обновление: ВКЛ",
-        status_off: "🔴 Обновление: ВЫКЛ",
-        button_enable: "🛠️ Включить обновление",
-        button_disable: "🛠️ Выключить обновление",
+        title: "??? Панель разработчика",
+        status_on: "?? Обновление: ВКЛ",
+        status_off: "?? Обновление: ВЫКЛ",
+        button_enable: "??? Включить обновление",
+        button_disable: "??? Выключить обновление",
       },
-      not_authorized: "❌ У вас нет доступа к командам разработчика.",
-      code_invalid: "❌ Неверный код разработчика.",
-      help: "🛠️ Dev: `dev <code>` • `test setup #channel Alice,Bob` • `as Alice vote Bob`",
+      not_authorized: "? У вас нет доступа к командам разработчика.",
+      code_invalid: "? Неверный код разработчика.",
+      help: "??? Dev: `dev <code>` • `test setup #channel Alice,Bob` • `as Alice vote Bob`",
     },
     maintenance: {
-      reply: "⏳ MafiaBot обновляется и скоро вернётся.",
-      blocked: "⚠️ Идёт обновление. Новые лобби временно недоступны.",
-      lobby_closed: "⚠️ Лобби закрыто из‑за обновления.",
-      done: "✅ Все активные игры завершены. Можно обновлять бота.",
+      reply: "? MafiaBot обновляется и скоро вернётся.",
+      blocked: "?? Идёт обновление. Новые лобби временно недоступны.",
+      lobby_closed: "?? Лобби закрыто из?за обновления.",
+      done: "? Все активные игры завершены. Можно обновлять бота.",
     },
     last_words: {
       prompt:
-        "🕯️ Вы выбыли. Напишите одно последнее сообщение в течение 2 минут — оно будет опубликовано в {channel}.",
-      received: "✅ Ваши последние слова опубликованы.",
-      expired: "⏳ Время вышло. Последние слова не отправлены.",
-      post: "🕯️ Последние слова от {name}: {text}",
+        "??? Вы выбыли. Напишите одно последнее сообщение в течение 2 минут — оно будет опубликовано в {channel}.",
+      received: "? Ваши последние слова опубликованы.",
+      expired: "? Время вышло. Последние слова не отправлены.",
+      post: "??? Последние слова от {name}: {text}",
     },
     dead: {
-      no_talk: "🚫 Вы выбыли и не можете писать в этом канале.",
-      message_deleted: "🚫 Вы выбыли и не можете писать в этом канале.",
+      no_talk: "?? Вы выбыли и не можете писать в этом канале.",
+      message_deleted: "?? Вы выбыли и не можете писать в этом канале.",
     },
     graveyard: {
       unavailable:
-        "⚠️ Кладбище недоступно (нет прав на создание/приглашение).",
+        "?? Кладбище недоступно (нет прав на создание/приглашение).",
     },
     mafia_room: {
-      intro: "🕶️ Мафия‑комната создана. Обсуждайте здесь ночью.",
+      intro: "??? Мафия?комната создана. Обсуждайте здесь ночью.",
     },
     whisper: {
-      usage: "ℹ️ Использование: `whisper <текст>`",
-      not_day: "⚠️ Шёпот доступен только днём.",
-      disabled: "🚫 Шёпот отключён для этого канала.",
-      already_used: "⚠️ Вы уже использовали шёпот сегодня.",
-      sent: "✅ Ваш шёпот отправлен анонимно.",
-      post: "💬 Анонимный шёпот: {text}",
+      usage: "?? Использование: `whisper <текст>`",
+      not_day: "?? Шёпот доступен только днём.",
+      disabled: "?? Шёпот отключён для этого канала.",
+      already_used: "?? Вы уже использовали шёпот сегодня.",
+      sent: "? Ваш шёпот отправлен анонимно.",
+      post: "?? Анонимный шёпот: {text}",
     },
     lobby: {
-      title: "🧩 Лобби мафии",
-      host: "👑 Хост: {host}",
-      players: "👥 Игроки: {count}/{min}",
-      ready: "✅ Готовы: {ready}/{total}",
-      start_in: "⏳ Старт через: {time}",
+      title: "?? Лобби мафии",
+      host: "?? Хост: {host}",
+      players: "?? Игроки: {count}/{min}",
+      ready: "? Готовы: {ready}/{total}",
+      start_in: "? Старт через: {time}",
       created:
-        "🧩 Создано лобби. Хост: {host}. Присоединяйтесь через `@MafiaBot join` или кнопку.",
-      joined: "➕ {user} присоединился. Игроков: {count}",
-      left: "➖ {user} вышел. Игроков: {count}",
-      empty_closed: "ℹ️ Лобби пустое. Игра удалена.",
+        "?? Создано лобби. Хост: {host}. Присоединяйтесь через `@MafiaBot join` или кнопку.",
+      joined: "? {user} присоединился. Игроков: {count}",
+      left: "? {user} вышел. Игроков: {count}",
+      empty_closed: "?? Лобби пустое. Игра удалена.",
       closed_not_enough:
-        "⚠️ Лобби закрыто: нужно минимум {min} игроков, сейчас {count}.",
-      timeout_start: "⏳ Время лобби истекло. Начинаем игру!",
-      host_start: "▶️ Хост запускает игру.",
-      ready_start: "✅ Все игроки готовы. Начинаем игру!",
-      extended: "⏳ Лобби продлено на {minutes} мин.",
-      closed: "❌ Лобби закрыто.",
-      starting: "▶️ Лобби закрыто. Игра стартует.",
-      end: "⏹️ Игра завершена.",
-      panel_summary: "🧩 Лобби: игроков {count}/{min}.",
+        "?? Лобби закрыто: нужно минимум {min} игроков, сейчас {count}.",
+      timeout_start: "? Время лобби истекло. Начинаем игру!",
+      host_start: "?? Хост запускает игру.",
+      ready_start: "? Все игроки готовы. Начинаем игру!",
+      extended: "? Лобби продлено на {minutes} мин.",
+      closed: "? Лобби закрыто.",
+      starting: "?? Лобби закрыто. Игра стартует.",
+      end: "?? Игра завершена.",
+      panel_summary: "?? Лобби: игроков {count}/{min}.",
     },
     warn: {
-      day: "⚠️ До конца дня осталось {seconds} сек.",
-      night: "⚠️ До конца ночи осталось {seconds} сек.",
-      lobby: "⚠️ До автозапуска лобби осталось {seconds} сек.",
-      shortened_day: "⚡ День сокращён из‑за высокой активности.",
-      shortened_night: "⚡ Ночь сокращена из‑за высокой активности.",
+      day: "?? До конца дня осталось {seconds} сек.",
+      night: "?? До конца ночи осталось {seconds} сек.",
+      lobby: "?? До автозапуска лобби осталось {seconds} сек.",
+      shortened_day: "? День сокращён из?за высокой активности.",
+      shortened_night: "? Ночь сокращена из?за высокой активности.",
     },
     reminder: {
-      night_action: "ночное действие 🌙",
-      vote: "голосование 🗳️",
-      text: "🔔 Напоминание: завершите {action} для игры в {channel}.",
+      night_action: "ночное действие ??",
+      vote: "голосование ???",
+      text: "?? Напоминание: завершите {action} для игры в {channel}.",
     },
     phase: {
-      night_start: "🌙 Ночь {round}. Город засыпает...",
-      day_start: "☀️ День {round}. Город просыпается...",
+      night_start: "?? Ночь {round}. Город засыпает...",
+      day_start: "?? День {round}. Город просыпается...",
     },
     night: {
-      ended_killed: "🌙 Ночь окончена. Убиты: {targets}.",
-      ended_none: "🌙 Ночь окончена. Никто не погиб.",
-      bodyguard: "🛡️ Телохранитель принял удар на себя.",
+      ended_killed: "?? Ночь окончена. Убиты: {targets}.",
+      ended_none: "?? Ночь окончена. Никто не погиб.",
+      bodyguard: "??? Телохранитель принял удар на себя.",
     },
     day: {
-      ended_executed: "🗳️ Голосование завершено. Казнен: {target} ({role}).",
-      ended_tie: "🗳️ Голосование завершено. Ничья, никто не казнен.",
+      ended_executed: "??? Голосование завершено. Казнен: {target} ({role}).",
+      ended_tie: "??? Голосование завершено. Ничья, никто не казнен.",
     },
     auto: {
-      applied: "🤖 Автодействия применены.",
+      applied: "?? Автодействия применены.",
     },
     winner: {
-      mafia: "🏆 Победа мафии!",
-      town: "🏆 Победа мирных!",
-      jester: "🏆 Победа шута!",
+      mafia: "?? Победа мафии!",
+      town: "?? Победа мирных!",
+      jester: "?? Победа шута!",
       summary: "{winner}\nМафия: {mafia}\nМирные: {town}",
       summary_jester: "{winner}\nШут: {jester}\nМафия: {mafia}\nМирные: {town}",
     },
     prompt: {
-      mafia: "😈 Игра в {channel}. Выберите цель для мафии.",
-      doctor: "🧑‍⚕️ Игра в {channel}. Кого спасти этой ночью?",
-      detective_mode: "🕵️ Выберите действие на эту ночь:",
-      detective: "🕵️ Игра в {channel}. Кого проверить?",
-      detective_kill: "🎯 Игра в {channel}. Кого убить?",
-      bodyguard: "🛡️ Игра в {channel}. Кого защищать?",
-      bum: "🧴 Игра в {channel}. К кому зайти этой ночью?",
-      lawyer: "⚖️ Игра в {channel}. Кого защищать?",
-      stalker: "🎯 Контракт: {role}. Выберите цель.",
-      day: "🗳️ Игра в {channel}. Ваш голос за исключение.",
+      mafia: "?? Игра в {channel}. Выберите цель для мафии.",
+      doctor: "????? Игра в {channel}. Кого спасти этой ночью?",
+      detective_mode: "??? Выберите действие на эту ночь:",
+      detective: "??? Игра в {channel}. Кого проверить?",
+      detective_kill: "?? Игра в {channel}. Кого убить?",
+      bodyguard: "??? Игра в {channel}. Кого защищать?",
+      bum: "?? Игра в {channel}. К кому зайти этой ночью?",
+      lawyer: "?? Игра в {channel}. Кого защищать?",
+      stalker: "?? Контракт: {role}. Выберите цель.",
+      day: "??? Игра в {channel}. Ваш голос за исключение.",
     },
     select: {
-      player: "👤 Выберите игрока",
-      target: "🎯 Выберите цель",
+      player: "?? Выберите игрока",
+      target: "?? Выберите цель",
     },
     help: {
       commands:
-        "ℹ️ Команды: create, join, leave, start, status, end, config, extend. Голосование и ночные действия приходят в личку.",
+        "?? Команды: create, join, leave, start, status, end, config, extend. Голосование и ночные действия приходят в личку.",
     },
     config: {
       summary:
-        "⚙️ Настройки: day={day}m, night={night}m, lobby={lobby}m, min={min}, extend={extend}",
+        "?? Настройки: day={day}m, night={night}m, lobby={lobby}m, min={min}, extend={extend}",
     },
     status: {
-      text: "ℹ️ Статус: {state}. Хост: {host}. Живые: {alive}",
+      text: "?? Статус: {state}. Хост: {host}. Живые: {alive}",
     },
     state: {
-      lobby: "🧩 лобби",
-      day: "☀️ день",
-      night: "🌙 ночь",
-      ended: "🏁 завершено",
+      lobby: "?? лобби",
+      day: "?? день",
+      night: "?? ночь",
+      ended: "?? завершено",
     },
     err: {
-      channel_unknown: "❌ Не удалось определить канал.",
-      already_in_other: "❌ Вы уже находитесь в лобби или игре в {channel}.",
-      lobby_not_active: "⚠️ Лобби не активно.",
-      lobby_exists: "⚠️ Игра уже создана в этом канале.",
-      lobby_none: "❌ Сейчас нет лобби. Создайте: @MafiaBot create",
-      already_in: "⚠️ Вы уже в игре.",
-      lobby_only: "❌ Покинуть можно только лобби.",
-      not_in_lobby: "❌ Вас нет в лобби.",
-      lobby_start_none: "⚠️ Нет активного лобби для старта.",
-      only_host_start: "❌ Запускать игру может только хост.",
-      need_min_players: "⚠️ Нужно минимум {min} игроков.",
-      game_not_created: "❌ Игра не создана.",
-      config_lobby_only: "⚠️ Настройка доступна только в лобби.",
-      config_host_only: "❌ Настраивать игру может только хост.",
-      config_usage_extend: "ℹ️ Использование: @MafiaBot config extend host|any",
+      channel_unknown: "? Не удалось определить канал.",
+      already_in_other: "? Вы уже находитесь в лобби или игре в {channel}.",
+      lobby_not_active: "?? Лобби не активно.",
+      lobby_exists: "?? Игра уже создана в этом канале.",
+      lobby_none: "? Сейчас нет лобби. Создайте: @MafiaBot create",
+      already_in: "?? Вы уже в игре.",
+      lobby_only: "? Покинуть можно только лобби.",
+      not_in_lobby: "? Вас нет в лобби.",
+      lobby_start_none: "?? Нет активного лобби для старта.",
+      only_host_start: "? Запускать игру может только хост.",
+      need_min_players: "?? Нужно минимум {min} игроков.",
+      game_not_created: "? Игра не создана.",
+      config_lobby_only: "?? Настройка доступна только в лобби.",
+      config_host_only: "? Настраивать игру может только хост.",
+      config_usage_extend: "?? Использование: @MafiaBot config extend host|any",
       config_usage_numbers:
-        "ℹ️ Использование: @MafiaBot config day 5 | night 2 | lobby 5 | min 4",
-      config_options: "ℹ️ Доступные настройки: day, night, lobby, min, extend",
-      extend_lobby_only: "⚠️ Продлевать можно только в лобби.",
-      extend_not_allowed: "❌ Продлевать может только хост или участник по настройке.",
-      no_active_game: "⚠️ Нет активной игры.",
-      only_host_end: "❌ Завершить игру может только хост.",
-      unknown_command: "❌ Неизвестная команда. Напишите @MafiaBot help",
+        "?? Использование: @MafiaBot config day 5 | night 2 | lobby 5 | min 4",
+      config_options: "?? Доступные настройки: day, night, lobby, min, extend",
+      extend_lobby_only: "?? Продлевать можно только в лобби.",
+      extend_not_allowed: "? Продлевать может только хост или участник по настройке.",
+      no_active_game: "?? Нет активной игры.",
+      only_host_end: "? Завершить игру может только хост.",
+      unknown_command: "? Неизвестная команда. Напишите @MafiaBot help",
     },
     ok: {
-      settings_updated: "✅ Настройки обновлены.",
+      settings_updated: "? Настройки обновлены.",
     },
     action: {
-      role_dm: "🎭 Ваша роль в игре {channel}: *{role}*.",
-      failed: "❌ Не удалось обработать выбор.",
-      game_ended: "⚠️ Игра уже завершена.",
-      not_in_game: "❌ Вы не участвуете или выбыли.",
-      not_day: "⚠️ Сейчас не день.",
-      choose_alive: "ℹ️ Нужно выбрать живого игрока.",
-      already_acted: "⚠️ Вы уже сделали действие в этой фазе.",
-      already_voted: "⚠️ Ваш голос уже зафиксирован.",
-      vote_recorded: "✅ Ваш голос учтен: {target}.",
-      vote_abstain: "✅ Вы воздержались.",
-      not_night: "⚠️ Сейчас не ночь.",
-      mafia_only: "❌ Команда доступна только мафии.",
-      no_mafia_target: "⚠️ Нельзя выбрать мафию.",
-      abstain_disabled: "🚫 Воздержание отключено в этом канале.",
-      no_kill_disabled: "🚫 «Без убийства» отключено в этом канале.",
-      choice_recorded: "✅ Ваш выбор: {target}.",
-      no_kill: "✅ Ваш выбор: не убивать.",
-      doctor_only: "❌ Команда доступна только доктору.",
-      detective_only: "❌ Команда доступна только детективу.",
-      bodyguard_only: "❌ Команда доступна только телохранителю.",
-      bum_only: "❌ Команда доступна только Бомжу.",
-      lawyer_only: "❌ Команда доступна только Адвокату.",
-      stalker_only: "❌ Команда доступна только Сталкеру.",
-      doctor_self_save_limit: "⚠️ Себя можно спасать только один раз за игру.",
-      doctor_save: "✅ Вы спасаете: {target}.",
-      detective_check: "✅ Вы проверяете: {target}.",
-      detective_kill: "✅ Вы убиваете: {target}.",
-      detective_result: "ℹ️ Результат проверки: {target} — {result}.",
-      bodyguard_protect: "✅ Вы защищаете: {target}.",
-      bum_visit: "✅ Вы заходите к: {target}.",
-      lawyer_protect: "✅ Вы защищаете: {target}.",
-      stalker_kill: "✅ Вы охотитесь на: {target}.",
-      result_mafia: "😈 мафия",
-      result_not_mafia: "👤 не мафия",
+      role_dm: "?? Ваша роль в игре {channel}: *{role}*.",
+      failed: "? Не удалось обработать выбор.",
+      game_ended: "?? Игра уже завершена.",
+      not_in_game: "? Вы не участвуете или выбыли.",
+      not_day: "?? Сейчас не день.",
+      choose_alive: "?? Нужно выбрать живого игрока.",
+      already_acted: "?? Вы уже сделали действие в этой фазе.",
+      already_voted: "?? Ваш голос уже зафиксирован.",
+      vote_recorded: "? Ваш голос учтен: {target}.",
+      vote_abstain: "? Вы воздержались.",
+      not_night: "?? Сейчас не ночь.",
+      mafia_only: "? Команда доступна только мафии.",
+      no_mafia_target: "?? Нельзя выбрать мафию.",
+      abstain_disabled: "?? Воздержание отключено в этом канале.",
+      no_kill_disabled: "?? «Без убийства» отключено в этом канале.",
+      choice_recorded: "? Ваш выбор: {target}.",
+      no_kill: "? Ваш выбор: не убивать.",
+      doctor_only: "? Команда доступна только доктору.",
+      detective_only: "? Команда доступна только детективу.",
+      bodyguard_only: "? Команда доступна только телохранителю.",
+      bum_only: "? Команда доступна только Бомжу.",
+      lawyer_only: "? Команда доступна только Адвокату.",
+      stalker_only: "? Команда доступна только Сталкеру.",
+      doctor_self_save_limit: "?? Себя можно спасать только один раз за игру.",
+      doctor_save: "? Вы спасаете: {target}.",
+      detective_check: "? Вы проверяете: {target}.",
+      detective_kill: "? Вы убиваете: {target}.",
+      detective_result: "?? Результат проверки: {target} — {result}.",
+      bodyguard_protect: "? Вы защищаете: {target}.",
+      bum_visit: "? Вы заходите к: {target}.",
+      lawyer_protect: "? Вы защищаете: {target}.",
+      stalker_kill: "? Вы охотитесь на: {target}.",
+      result_mafia: "?? мафия",
+      result_not_mafia: "?? не мафия",
     },
     bum: {
-      witness: "🧴 Вы стали свидетелем убийства: {killer} убил {victim}.",
-      nothing: "🧴 Сегодня вы ничего не увидели.",
+      witness: "?? Вы стали свидетелем убийства: {killer} убил {victim}.",
+      nothing: "?? Сегодня вы ничего не увидели.",
     },
     stalker: {
-      target_assigned: "🎯 Ваша цель по роли: {role}.",
-      success: "🏆 Контракт выполнен! Побед: {wins}. Новая цель: {role}.",
-      failed: "⚠️ Контракт провален. Новая цель: {role}.",
-      no_targets: "⚠️ Нет доступных ролей для цели.",
+      target_assigned: "?? Ваша цель по роли: {role}.",
+      success: "?? Контракт выполнен! Побед: {wins}. Новая цель: {role}.",
+      failed: "?? Контракт провален. Новая цель: {role}.",
+      no_targets: "?? Нет доступных ролей для цели.",
     },
     sergeant: {
-      promoted: "🎖️ Детектив погиб. Теперь его действия доступны вам.",
-      info: "🎖️ Результат детектива: {target} — {result}.",
+      promoted: "??? Детектив погиб. Теперь его действия доступны вам.",
+      info: "??? Результат детектива: {target} — {result}.",
     },
     dm_cmd: {
-      no_game: "⚠️ Нет активной игры для этой команды.",
-      need_alive: "ℹ️ Нужно указать живого игрока.",
-      day_only: "⚠️ Дневные действия доступны только днём.",
-      night_only: "⚠️ Ночные действия доступны только ночью.",
-      mafia_only: "❌ Команда доступна только мафии.",
-      no_mafia_target: "⚠️ Нельзя выбрать мафию.",
-      doctor_only: "❌ Команда доступна только доктору.",
-      detective_only: "❌ Команда доступна только детективу.",
-      bodyguard_only: "❌ Команда доступна только телохранителю.",
-      bum_only: "❌ Команда доступна только Бомжу.",
-      lawyer_only: "❌ Команда доступна только Адвокату.",
-      stalker_only: "❌ Команда доступна только Сталкеру.",
-      doctor_self_save_limit: "⚠️ Себя можно спасать только один раз за игру.",
-      vote_recorded: "✅ Ваш голос учтен: {target}.",
-      choice_recorded: "✅ Ваш выбор: {target}.",
-      doctor_save: "✅ Вы спасаете: {target}.",
-      detective_check: "✅ Вы проверяете: {target}.",
-      detective_kill: "✅ Вы убиваете: {target}.",
-      detective_result: "ℹ️ Результат проверки: {target} — {result}.",
-      result_mafia: "😈 мафия",
-      result_not_mafia: "👤 не мафия",
-      bodyguard_protect: "✅ Вы защищаете: {target}.",
-      bum_visit: "✅ Вы заходите к: {target}.",
-      lawyer_protect: "✅ Вы защищаете: {target}.",
-      stalker_kill: "✅ Вы охотитесь на: {target}.",
+      no_game: "?? Нет активной игры для этой команды.",
+      need_alive: "?? Нужно указать живого игрока.",
+      day_only: "?? Дневные действия доступны только днём.",
+      night_only: "?? Ночные действия доступны только ночью.",
+      mafia_only: "? Команда доступна только мафии.",
+      no_mafia_target: "?? Нельзя выбрать мафию.",
+      doctor_only: "? Команда доступна только доктору.",
+      detective_only: "? Команда доступна только детективу.",
+      bodyguard_only: "? Команда доступна только телохранителю.",
+      bum_only: "? Команда доступна только Бомжу.",
+      lawyer_only: "? Команда доступна только Адвокату.",
+      stalker_only: "? Команда доступна только Сталкеру.",
+      doctor_self_save_limit: "?? Себя можно спасать только один раз за игру.",
+      vote_recorded: "? Ваш голос учтен: {target}.",
+      choice_recorded: "? Ваш выбор: {target}.",
+      doctor_save: "? Вы спасаете: {target}.",
+      detective_check: "? Вы проверяете: {target}.",
+      detective_kill: "? Вы убиваете: {target}.",
+      detective_result: "?? Результат проверки: {target} — {result}.",
+      result_mafia: "?? мафия",
+      result_not_mafia: "?? не мафия",
+      bodyguard_protect: "? Вы защищаете: {target}.",
+      bum_visit: "? Вы заходите к: {target}.",
+      lawyer_protect: "? Вы защищаете: {target}.",
+      stalker_kill: "? Вы охотитесь на: {target}.",
       unknown_command:
-        "❌ Команда не распознана. Используйте kill/save/check/protect/visit/defend/stalk @user.",
+        "? Команда не распознана. Используйте kill/save/check/protect/visit/defend/stalk @user.",
     },
     test: {
-      not_dev: "❌ Только разработчик может использовать тест‑команды.",
-      setup_usage: "ℹ️ Использование: `test setup #channel Alice,Bob,Charlie`",
-      list_usage: "ℹ️ Использование: `test list #channel`",
+      not_dev: "? Только разработчик может использовать тест?команды.",
+      setup_usage: "?? Использование: `test setup #channel Alice,Bob,Charlie`",
+      list_usage: "?? Использование: `test list #channel`",
       setup_ok:
-        "✅ 🧪 Тестовое лобби готово в {channel}. Игроки: {players}\nКоманда: `as <name> <action>`.",
-      duplicate_names: "❌ Повторяющиеся имена: {names}.",
-      active_game: "⚠️ Нельзя включить тест‑режим во время активной игры.",
+        "? ?? Тестовое лобби готово в {channel}. Игроки: {players}\nКоманда: `as <name> <action>`.",
+      duplicate_names: "? Повторяющиеся имена: {names}.",
+      active_game: "?? Нельзя включить тест?режим во время активной игры.",
       real_players:
-        "⚠️ Уберите реальных игроков из лобби перед включением тест‑режима.",
-      no_game: "⚠️ Тестовая игра не найдена. Используйте `test setup` или укажите #channel.",
-      list: "🧪 Тестовые игроки в {channel}: {players}",
-      as_usage: "ℹ️ Использование: `as <name> <action> [target]`",
-      actor_not_found: "❌ Тестовый игрок `{name}` не найден.",
-      target_not_found: "❌ Цель не найдена: `{name}`.",
-      roles_summary: "🧪 *Роли тест‑игроков* в {channel}:\n{list}",
+        "?? Уберите реальных игроков из лобби перед включением тест?режима.",
+      no_game: "?? Тестовая игра не найдена. Используйте `test setup` или укажите #channel.",
+      list: "?? Тестовые игроки в {channel}: {players}",
+      as_usage: "?? Использование: `as <name> <action> [target]`",
+      actor_not_found: "? Тестовый игрок `{name}` не найден.",
+      target_not_found: "? Цель не найдена: `{name}`.",
+      roles_summary: "?? *Роли тест?игроков* в {channel}:\n{list}",
       actions_reminder_night:
-        "🌙 *Тест‑действия (ночь)* в {channel}:\n{list}\nКоманда: `as <name> <action> <target>`",
+        "?? *Тест?действия (ночь)* в {channel}:\n{list}\nКоманда: `as <name> <action> <target>`",
       actions_reminder_day:
-        "☀️ *Тест‑действия (день)* в {channel}:\n{list}\nКоманда: `as <name> vote <target>` или `as <name> abstain`",
+        "?? *Тест?действия (день)* в {channel}:\n{list}\nКоманда: `as <name> vote <target>` или `as <name> abstain`",
     },
   },
 };
@@ -1456,8 +1456,8 @@ const FAQ_ITEMS = [
   {
     id: "auto-shorten",
     q: {
-      en: "What is Auto‑shorten?",
-      ru: "Что такое авто‑сокращение фаз?",
+      en: "What is Auto?shorten?",
+      ru: "Что такое авто?сокращение фаз?",
     },
     a: {
       en:
@@ -1482,7 +1482,7 @@ const FAQ_ITEMS = [
   {
     id: "no-kill",
     q: {
-      en: "What is No‑kill for mafia?",
+      en: "What is No?kill for mafia?",
       ru: "Что такое «Без убийства» у мафии?",
     },
     a: {
@@ -1495,8 +1495,8 @@ const FAQ_ITEMS = [
   {
     id: "doctor-self-save",
     q: {
-      en: "Doctor self‑save limit — how it works?",
-      ru: "Лимит self‑save доктора — как работает?",
+      en: "Doctor self?save limit — how it works?",
+      ru: "Лимит self?save доктора — как работает?",
     },
     a: {
       en:
@@ -1587,9 +1587,9 @@ function normalizeLang(lang) {
   return lang === "ru" ? "ru" : "en";
 }
 
-function getUserLangInfo(userId) {
+async function getUserLangInfo(userId) {
   if (userLangCache.has(userId)) return userLangCache.get(userId);
-  const row = selectUserLangStmt.get(userId);
+  const row = await db.getUserLang(userId);
   const info = row?.lang
     ? { lang: normalizeLang(row.lang), explicit: true }
     : { lang: DEFAULT_LANG, explicit: false };
@@ -1597,8 +1597,8 @@ function getUserLangInfo(userId) {
   return info;
 }
 
-function getUserLang(userId) {
-  return getUserLangInfo(userId).lang;
+async function getUserLang(userId) {
+  return (await getUserLangInfo(userId)).lang;
 }
 
 function isDevUser(userId) {
@@ -1616,9 +1616,9 @@ function getDefaultMaintenanceState() {
   return { enabled: false, by: null, requested_at: null, notified: false };
 }
 
-function getMaintenanceState() {
+async function getMaintenanceState() {
   if (maintenanceCache) return maintenanceCache;
-  const row = selectAppStateStmt.get("maintenance");
+  const row = await db.getAppState("maintenance");
   if (!row || !row.value) {
     maintenanceCache = getDefaultMaintenanceState();
     return maintenanceCache;
@@ -1632,20 +1632,20 @@ function getMaintenanceState() {
   return maintenanceCache;
 }
 
-function setMaintenanceState(state) {
+async function setMaintenanceState(state) {
   const next = { ...getDefaultMaintenanceState(), ...state };
   maintenanceCache = next;
-  upsertAppStateStmt.run("maintenance", JSON.stringify(next), now());
+  await db.setAppState("maintenance", JSON.stringify(next), now());
   return next;
 }
 
-function isMaintenanceEnabled() {
-  return getMaintenanceState().enabled;
+async function isMaintenanceEnabled() {
+  return (await getMaintenanceState()).enabled;
 }
 
-function setUserLang(userId, lang) {
+async function setUserLang(userId, lang) {
   const normalized = normalizeLang(lang);
-  upsertUserLangStmt.run(userId, normalized, now());
+  await db.setUserLang(userId, normalized, now());
   const info = { lang: normalized, explicit: true };
   userLangCache.set(userId, info);
   return info;
@@ -1669,29 +1669,30 @@ function computeWinRate(stats) {
   return Math.round((stats.wins / stats.games) * 100);
 }
 
-function getUserStats(userId) {
-  return normalizeStatsRow(selectUserStatsStmt.get(userId));
+async function getUserStats(userId) {
+  return normalizeStatsRow(await db.getUserStats(userId));
 }
 
-function getUserChannelStats(userId, channelId) {
-  return normalizeStatsRow(selectUserChannelStatsStmt.get(userId, channelId));
+async function getUserChannelStats(userId, channelId) {
+  return normalizeStatsRow(await db.getUserChannelStats(userId, channelId));
 }
 
-function getUserRoleStats(userId) {
-  return listUserRoleStatsStmt.all(userId).map((row) => ({
+async function getUserRoleStats(userId) {
+  const rows = await db.listUserRoleStats(userId);
+  return rows.map((row) => ({
     role: row.role,
     ...normalizeStatsRow(row),
   }));
 }
 
-function updateUserStats(userId, isWin) {
-  const current = getUserStats(userId);
+async function updateUserStats(userId, isWin) {
+  const current = await getUserStats(userId);
   const next = {
     wins: current.wins + (isWin ? 1 : 0),
     losses: current.losses + (isWin ? 0 : 1),
     games: current.games + 1,
   };
-  upsertUserStatsStmt.run(
+  await db.upsertUserStats(
     userId,
     next.wins,
     next.losses,
@@ -1700,14 +1701,14 @@ function updateUserStats(userId, isWin) {
   );
 }
 
-function updateUserChannelStats(userId, channelId, isWin) {
-  const current = getUserChannelStats(userId, channelId);
+async function updateUserChannelStats(userId, channelId, isWin) {
+  const current = await getUserChannelStats(userId, channelId);
   const next = {
     wins: current.wins + (isWin ? 1 : 0),
     losses: current.losses + (isWin ? 0 : 1),
     games: current.games + 1,
   };
-  upsertUserChannelStatsStmt.run(
+  await db.upsertUserChannelStats(
     userId,
     channelId,
     next.wins,
@@ -1717,14 +1718,14 @@ function updateUserChannelStats(userId, channelId, isWin) {
   );
 }
 
-function updateUserRoleStats(userId, role, isWin) {
-  const current = normalizeStatsRow(selectUserRoleStatsStmt.get(userId, role));
+async function updateUserRoleStats(userId, role, isWin) {
+  const current = normalizeStatsRow(await db.getUserRoleStats(userId, role));
   const next = {
     wins: current.wins + (isWin ? 1 : 0),
     losses: current.losses + (isWin ? 0 : 1),
     games: current.games + 1,
   };
-  upsertUserRoleStatsStmt.run(
+  await db.upsertUserRoleStats(
     userId,
     role,
     next.wins,
@@ -1734,14 +1735,14 @@ function updateUserRoleStats(userId, role, isWin) {
   );
 }
 
-function incrementUserRoleStats(userId, role, winsDelta, lossesDelta, gamesDelta) {
-  const current = normalizeStatsRow(selectUserRoleStatsStmt.get(userId, role));
+async function incrementUserRoleStats(userId, role, winsDelta, lossesDelta, gamesDelta) {
+  const current = normalizeStatsRow(await db.getUserRoleStats(userId, role));
   const next = {
     wins: current.wins + (winsDelta || 0),
     losses: current.losses + (lossesDelta || 0),
     games: current.games + (gamesDelta || 0),
   };
-  upsertUserRoleStatsStmt.run(
+  await db.upsertUserRoleStats(
     userId,
     role,
     next.wins,
@@ -1751,8 +1752,8 @@ function incrementUserRoleStats(userId, role, winsDelta, lossesDelta, gamesDelta
   );
 }
 
-function getChannelPref(channelId) {
-  return selectChannelPrefStmt.get(channelId) || null;
+async function getChannelPref(channelId) {
+  return (await db.getChannelPref(channelId)) || null;
 }
 
 function parseSettingsJson(value) {
@@ -1764,8 +1765,8 @@ function parseSettingsJson(value) {
   }
 }
 
-function getChannelSettings(channelId) {
-  const pref = getChannelPref(channelId);
+async function getChannelSettings(channelId) {
+  const pref = await getChannelPref(channelId);
   return parseSettingsJson(pref?.settings_json);
 }
 
@@ -1782,10 +1783,10 @@ function getChannelLangForGame(game) {
   return normalizeChannelLang(game?.config?.channelLang || DEFAULT_LANG);
 }
 
-function ensureChannelPref(channelId, meta = {}) {
-  const existing = getChannelPref(channelId);
+async function ensureChannelPref(channelId, meta = {}) {
+  const existing = await getChannelPref(channelId);
   if (existing) return existing;
-  upsertChannelPrefStmt.run(
+  await db.upsertChannelPref(
     channelId,
     0,
     meta.channelType || null,
@@ -1797,14 +1798,14 @@ function ensureChannelPref(channelId, meta = {}) {
   return getChannelPref(channelId);
 }
 
-function markChannelPrompted(channelId, meta = {}) {
-  const existing = getChannelPref(channelId);
+async function markChannelPrompted(channelId, meta = {}) {
+  const existing = await getChannelPref(channelId);
   const promptedAt = existing?.prompted_at || meta.promptedAt || now();
   const listed = existing?.listed || 0;
   const listedBy = existing?.listed_by || meta.listedBy || null;
   const channelType = meta.channelType || existing?.channel_type || null;
   const settingsJson = meta.settingsJson || existing?.settings_json || null;
-  upsertChannelPrefStmt.run(
+  await db.upsertChannelPref(
     channelId,
     listed,
     channelType,
@@ -1816,13 +1817,13 @@ function markChannelPrompted(channelId, meta = {}) {
   return getChannelPref(channelId);
 }
 
-function setChannelListing(channelId, listed, meta = {}) {
-  const existing = getChannelPref(channelId);
+async function setChannelListing(channelId, listed, meta = {}) {
+  const existing = await getChannelPref(channelId);
   const channelType = meta.channelType || existing?.channel_type || null;
   const promptedAt = existing?.prompted_at || meta.promptedAt || null;
   const listedBy = meta.listedBy || existing?.listed_by || null;
   const settingsJson = meta.settingsJson || existing?.settings_json || null;
-  upsertChannelPrefStmt.run(
+  await db.upsertChannelPref(
     channelId,
     listed ? 1 : 0,
     channelType,
@@ -1834,23 +1835,23 @@ function setChannelListing(channelId, listed, meta = {}) {
   return getChannelPref(channelId);
 }
 
-function listListedChannels() {
-  return listListedChannelsStmt.all();
+async function listListedChannels() {
+  return db.listListedChannels();
 }
 
-function listOwnedChannels(userId) {
-  return listOwnedChannelsStmt.all(userId);
+async function listOwnedChannels(userId) {
+  return db.listOwnedChannels(userId);
 }
 
-function setChannelSettings(channelId, settings, meta = {}) {
-  const existing = getChannelPref(channelId);
+async function setChannelSettings(channelId, settings, meta = {}) {
+  const existing = await getChannelPref(channelId);
   const listed = existing?.listed || 0;
   const channelType = meta.channelType || existing?.channel_type || null;
   const promptedAt = existing?.prompted_at || meta.promptedAt || null;
   const listedBy = meta.listedBy || existing?.listed_by || null;
   const settingsJson =
     typeof settings === "string" ? settings : JSON.stringify(settings);
-  upsertChannelPrefStmt.run(
+  await db.upsertChannelPref(
     channelId,
     listed,
     channelType,
@@ -1921,127 +1922,6 @@ const app = new App({
   logLevel: LogLevel.INFO,
 });
 
-const dbPath =
-  process.env.MAFIA_DB_PATH || path.join(__dirname, "..", "data", "mafia.db");
-fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-
-const db = new Database(dbPath);
-db.exec(`
-  CREATE TABLE IF NOT EXISTS games (
-    channel_id TEXT PRIMARY KEY,
-    state_json TEXT NOT NULL,
-    phase_deadline INTEGER,
-    updated_at INTEGER NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS user_prefs (
-    user_id TEXT PRIMARY KEY,
-    lang TEXT,
-    updated_at INTEGER NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS channel_prefs (
-    channel_id TEXT PRIMARY KEY,
-    listed INTEGER,
-    channel_type TEXT,
-    updated_at INTEGER NOT NULL,
-    prompted_at INTEGER,
-    listed_by TEXT,
-    settings_json TEXT
-  );
-  CREATE TABLE IF NOT EXISTS app_state (
-    key TEXT PRIMARY KEY,
-    value TEXT,
-    updated_at INTEGER NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS user_stats (
-    user_id TEXT PRIMARY KEY,
-    wins INTEGER,
-    losses INTEGER,
-    games INTEGER,
-    updated_at INTEGER NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS user_channel_stats (
-    user_id TEXT,
-    channel_id TEXT,
-    wins INTEGER,
-    losses INTEGER,
-    games INTEGER,
-    updated_at INTEGER NOT NULL,
-    PRIMARY KEY (user_id, channel_id)
-  );
-  CREATE TABLE IF NOT EXISTS user_role_stats (
-    user_id TEXT,
-    role TEXT,
-    wins INTEGER,
-    losses INTEGER,
-    games INTEGER,
-    updated_at INTEGER NOT NULL,
-    PRIMARY KEY (user_id, role)
-  );
-`);
-
-const channelPrefsColumns = db
-  .prepare("PRAGMA table_info(channel_prefs)")
-  .all()
-  .map((row) => row.name);
-if (!channelPrefsColumns.includes("settings_json")) {
-  db.exec("ALTER TABLE channel_prefs ADD COLUMN settings_json TEXT");
-}
-
-const saveStmt = db.prepare(
-  "INSERT INTO games (channel_id, state_json, phase_deadline, updated_at) VALUES (?, ?, ?, ?) " +
-    "ON CONFLICT(channel_id) DO UPDATE SET state_json=excluded.state_json, phase_deadline=excluded.phase_deadline, updated_at=excluded.updated_at"
-);
-const deleteStmt = db.prepare("DELETE FROM games WHERE channel_id = ?");
-const selectAllStmt = db.prepare("SELECT state_json FROM games");
-const selectUserLangStmt = db.prepare(
-  "SELECT lang FROM user_prefs WHERE user_id = ?"
-);
-const upsertUserLangStmt = db.prepare(
-  "INSERT INTO user_prefs (user_id, lang, updated_at) VALUES (?, ?, ?) " +
-    "ON CONFLICT(user_id) DO UPDATE SET lang=excluded.lang, updated_at=excluded.updated_at"
-);
-const selectChannelPrefStmt = db.prepare(
-  "SELECT channel_id, listed, channel_type, updated_at, prompted_at, listed_by, settings_json FROM channel_prefs WHERE channel_id = ?"
-);
-const upsertChannelPrefStmt = db.prepare(
-  "INSERT INTO channel_prefs (channel_id, listed, channel_type, updated_at, prompted_at, listed_by, settings_json) VALUES (?, ?, ?, ?, ?, ?, ?) " +
-    "ON CONFLICT(channel_id) DO UPDATE SET listed=excluded.listed, channel_type=COALESCE(excluded.channel_type, channel_prefs.channel_type), updated_at=excluded.updated_at, prompted_at=COALESCE(excluded.prompted_at, channel_prefs.prompted_at), listed_by=COALESCE(excluded.listed_by, channel_prefs.listed_by), settings_json=COALESCE(excluded.settings_json, channel_prefs.settings_json)"
-);
-const listListedChannelsStmt = db.prepare(
-  "SELECT channel_id, listed, channel_type, updated_at, settings_json FROM channel_prefs WHERE listed = 1 ORDER BY updated_at DESC"
-);
-const listOwnedChannelsStmt = db.prepare(
-  "SELECT channel_id, listed, channel_type, updated_at, settings_json FROM channel_prefs WHERE listed_by = ? ORDER BY updated_at DESC"
-);
-const selectAppStateStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
-const upsertAppStateStmt = db.prepare(
-  "INSERT INTO app_state (key, value, updated_at) VALUES (?, ?, ?) " +
-    "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at"
-);
-const selectUserStatsStmt = db.prepare(
-  "SELECT wins, losses, games FROM user_stats WHERE user_id = ?"
-);
-const upsertUserStatsStmt = db.prepare(
-  "INSERT INTO user_stats (user_id, wins, losses, games, updated_at) VALUES (?, ?, ?, ?, ?) " +
-    "ON CONFLICT(user_id) DO UPDATE SET wins=excluded.wins, losses=excluded.losses, games=excluded.games, updated_at=excluded.updated_at"
-);
-const selectUserChannelStatsStmt = db.prepare(
-  "SELECT wins, losses, games FROM user_channel_stats WHERE user_id = ? AND channel_id = ?"
-);
-const upsertUserChannelStatsStmt = db.prepare(
-  "INSERT INTO user_channel_stats (user_id, channel_id, wins, losses, games, updated_at) VALUES (?, ?, ?, ?, ?, ?) " +
-    "ON CONFLICT(user_id, channel_id) DO UPDATE SET wins=excluded.wins, losses=excluded.losses, games=excluded.games, updated_at=excluded.updated_at"
-);
-const selectUserRoleStatsStmt = db.prepare(
-  "SELECT wins, losses, games FROM user_role_stats WHERE user_id = ? AND role = ?"
-);
-const upsertUserRoleStatsStmt = db.prepare(
-  "INSERT INTO user_role_stats (user_id, role, wins, losses, games, updated_at) VALUES (?, ?, ?, ?, ?, ?) " +
-    "ON CONFLICT(user_id, role) DO UPDATE SET wins=excluded.wins, losses=excluded.losses, games=excluded.games, updated_at=excluded.updated_at"
-);
-const listUserRoleStatsStmt = db.prepare(
-  "SELECT role, wins, losses, games FROM user_role_stats WHERE user_id = ? ORDER BY games DESC"
-);
 
 const gameCache = new Map();
 const channelLocks = new Map();
@@ -2076,6 +1956,9 @@ function cacheTelegramUser(user) {
   if (handle) tgHandleCache.set(handle.toLowerCase(), idKey);
   userCache.set(idKey, label);
   userDisplayCache.set(idKey, info);
+  db.upsertUserCache(idKey, PLATFORM_TELEGRAM, label, handle, now()).catch(
+    (err) => console.warn("Failed to cache telegram user:", err?.message || err)
+  );
 }
 
 function cacheTelegramChat(chat) {
@@ -2085,6 +1968,15 @@ function cacheTelegramChat(chat) {
   const info = { title, username: chat.username || null, type: chat.type || null };
   tgChatCache.set(idKey, info);
   channelInfoCache.set(idKey, { name: title, is_private: chat.type === "private" });
+  db.upsertChannelCache(
+    idKey,
+    PLATFORM_TELEGRAM,
+    title,
+    chat.type === "private",
+    now()
+  ).catch((err) =>
+    console.warn("Failed to cache telegram chat:", err?.message || err)
+  );
 }
 
 function formatDuration(lang, ms) {
@@ -2224,21 +2116,29 @@ function serializeGame(game) {
   return JSON.stringify(game);
 }
 
-function saveGame(game) {
-  saveStmt.run(
-    game.channelId,
-    serializeGame(game),
-    game.phaseDeadline || null,
-    now()
-  );
+async function saveGame(game) {
+  try {
+    await db.saveGame(
+      game.channelId,
+      serializeGame(game),
+      game.phaseDeadline || null,
+      now()
+    );
+  } catch (err) {
+    console.error("Failed to save game:", err?.message || err);
+  }
 }
 
-function deleteGame(channelId) {
-  deleteStmt.run(channelId);
+async function deleteGame(channelId) {
+  try {
+    await db.deleteGame(channelId);
+  } catch (err) {
+    console.error("Failed to delete game:", err?.message || err);
+  }
 }
 
-function loadAllGames() {
-  const rows = selectAllStmt.all();
+async function loadAllGames() {
+  const rows = await db.loadAllGames();
   return rows.map((row) => JSON.parse(row.state_json));
 }
 
@@ -2673,7 +2573,7 @@ async function getNameOrMention(client, game, userId, lang) {
   if (!game?.players?.[userId]) {
     return getUserLabel(client, userId);
   }
-  const userLang = getUserLang(userId);
+  const userLang = await getUserLang(userId);
   if (userLang === lang) return mention(userId);
   return getUserLabel(client, userId);
 }
@@ -2732,7 +2632,7 @@ async function notifyStalker(client, game, key, role) {
   const stalkerId = game.roles.stalkerId;
   if (!stalkerId || !isPlayerAlive(game, stalkerId)) return;
   if (isTestUserId(stalkerId)) return;
-  const lang = getUserLang(stalkerId);
+  const lang = await getUserLang(stalkerId);
   const roleText = role ? roleLabel(role, lang) : t(lang, "home.role_unknown");
   await sendInteractiveDM(client, stalkerId, t(lang, key, { role: roleText, wins: game.stalker?.wins || 0 }));
 }
@@ -2742,7 +2642,7 @@ async function assignNewStalkerTarget(client, game, reasonKey) {
   const newRole = pickStalkerTargetRole(game);
   if (!game.stalker) game.stalker = { targetRole: null, wins: 0, losses: 0 };
   game.stalker.targetRole = newRole;
-  saveGame(game);
+  await saveGame(game);
   if (!newRole) {
     await notifyStalker(client, game, "stalker.no_targets");
     return;
@@ -2750,21 +2650,21 @@ async function assignNewStalkerTarget(client, game, reasonKey) {
   await notifyStalker(client, game, reasonKey || "stalker.target_assigned", newRole);
 }
 
-function recordStalkerWin(game) {
+async function recordStalkerWin(game) {
   if (!game.roles.stalkerId) return;
   if (!game.stalker) game.stalker = { targetRole: null, wins: 0, losses: 0 };
   game.stalker.wins = (game.stalker.wins || 0) + 1;
   if (!isTestUserId(game.roles.stalkerId)) {
-    incrementUserRoleStats(game.roles.stalkerId, "stalker", 1, 0, 1);
+    await incrementUserRoleStats(game.roles.stalkerId, "stalker", 1, 0, 1);
   }
 }
 
-function recordStalkerLoss(game) {
+async function recordStalkerLoss(game) {
   if (!game.roles.stalkerId) return;
   if (!game.stalker) game.stalker = { targetRole: null, wins: 0, losses: 0 };
   game.stalker.losses = (game.stalker.losses || 0) + 1;
   if (!isTestUserId(game.roles.stalkerId)) {
-    incrementUserRoleStats(game.roles.stalkerId, "stalker", 0, 1, 1);
+    await incrementUserRoleStats(game.roles.stalkerId, "stalker", 0, 1, 1);
   }
 }
 
@@ -2775,9 +2675,9 @@ async function maybePromoteSergeant(client, game) {
   if (!isPlayerAlive(game, sergeantId)) return;
   if (game.roles.detectiveId === sergeantId) return;
   game.roles.detectiveId = sergeantId;
-  saveGame(game);
+  await saveGame(game);
   if (!isTestUserId(sergeantId)) {
-    const lang = getUserLang(sergeantId);
+    const lang = await getUserLang(sergeantId);
     await sendInteractiveDM(client, sergeantId, t(lang, "sergeant.promoted"));
   }
 }
@@ -2797,11 +2697,32 @@ async function getUserDisplayInfo(client, userId) {
   if (isTelegramKey(userId)) {
     const cached = tgUserCache.get(userId);
     if (cached) return cached;
+    const dbCached = await db.getUserCache(userId);
+    if (dbCached?.display_name) {
+      const result = {
+        label: dbCached.display_name,
+        handle: dbCached.handle || null,
+      };
+      tgUserCache.set(userId, result);
+      if (result.handle) {
+        tgHandleCache.set(result.handle.toLowerCase(), userId);
+      }
+      userCache.set(userId, result.label);
+      userDisplayCache.set(userId, result);
+      return result;
+    }
     const rawId = stripPlatformPrefix(userId);
     return { label: `tg:${rawId}`, handle: null };
   }
   if (!userInfoEnabled) return { label: userId, handle: null };
   if (userDisplayCache.has(userId)) return userDisplayCache.get(userId);
+  const cached = await db.getUserCache(userId);
+  if (cached?.display_name) {
+    const result = { label: cached.display_name, handle: cached.handle || null };
+    userDisplayCache.set(userId, result);
+    userCache.set(userId, result.label);
+    return result;
+  }
 
   try {
     const info = await client.users.info({ user: stripPlatformPrefix(userId) });
@@ -2812,6 +2733,13 @@ async function getUserDisplayInfo(client, userId) {
     const result = { label, handle };
     userDisplayCache.set(userId, result);
     userCache.set(userId, label);
+    await db.upsertUserCache(
+      userId,
+      PLATFORM_SLACK,
+      label,
+      handle,
+      now()
+    );
     return result;
   } catch (err) {
     if (err?.data?.error === "missing_scope") {
@@ -2827,11 +2755,35 @@ async function getChannelInfo(client, channelId) {
     if (cached) {
       return { name: cached.title, is_private: cached.type === "private" };
     }
+    const dbCached = await db.getChannelCache(channelId);
+    if (dbCached?.name) {
+      const result = {
+        name: dbCached.name,
+        is_private:
+          dbCached.is_private === null || dbCached.is_private === undefined
+            ? null
+            : Boolean(dbCached.is_private),
+      };
+      channelInfoCache.set(channelId, result);
+      return result;
+    }
     const rawId = stripPlatformPrefix(channelId);
     return { name: `tg:${rawId}`, is_private: null };
   }
   if (!channelInfoEnabled) return { name: channelId, is_private: null };
   if (channelInfoCache.has(channelId)) return channelInfoCache.get(channelId);
+  const cached = await db.getChannelCache(channelId);
+  if (cached?.name) {
+    const result = {
+      name: cached.name,
+      is_private:
+        cached.is_private === null || cached.is_private === undefined
+          ? null
+          : Boolean(cached.is_private),
+    };
+    channelInfoCache.set(channelId, result);
+    return result;
+  }
   try {
     const info = await client.conversations.info({
       channel: stripPlatformPrefix(channelId),
@@ -2840,6 +2792,13 @@ async function getChannelInfo(client, channelId) {
     const isPrivate = Boolean(info.channel?.is_private);
     const result = { name, is_private: isPrivate };
     channelInfoCache.set(channelId, result);
+    await db.upsertChannelCache(
+      channelId,
+      PLATFORM_SLACK,
+      name,
+      isPrivate,
+      now()
+    );
     return result;
   } catch (err) {
     if (err?.data?.error === "missing_scope") {
@@ -2946,10 +2905,10 @@ function buildFaqListView(lang, page = 0) {
   slice.forEach((item) => {
     blocks.push({
       type: "section",
-      text: { type: "mrkdwn", text: `• ❓ ${item.q}` },
+      text: { type: "mrkdwn", text: `• ? ${item.q}` },
       accessory: {
         type: "button",
-        text: { type: "plain_text", text: "ⓘ" },
+        text: { type: "plain_text", text: "?" },
         action_id: ACTIONS.FAQ_TOPIC,
         value: item.id,
       },
@@ -3011,11 +2970,11 @@ function buildFaqDetailView(lang, id, page = 0) {
     blocks: [
       {
         type: "header",
-        text: { type: "plain_text", text: `❓ ${question}` },
+        text: { type: "plain_text", text: `? ${question}` },
       },
       {
         type: "section",
-        text: { type: "mrkdwn", text: `ℹ️ ${answer}` },
+        text: { type: "mrkdwn", text: `?? ${answer}` },
       },
       {
         type: "context",
@@ -3078,7 +3037,7 @@ function buildTelegramFaqList(lang, page = 0) {
     text += `\n• ${item.q}`;
     rows.push([
       Markup.button.callback(
-        `ⓘ ${truncateButtonText(item.q, 40)}`,
+        `? ${truncateButtonText(item.q, 40)}`,
         buildTelegramCallback(ACTIONS.FAQ_TOPIC, item.id, safePage, "")
       ),
     ]);
@@ -3113,7 +3072,7 @@ function buildTelegramFaqDetail(lang, id, page = 0) {
   }
   const text =
     `${t(lang, "faq.title")}\n` +
-    `\n❓ ${item.q}\n` +
+    `\n? ${item.q}\n` +
     `${item.a}\n` +
     `${t(lang, "faq.id_label", { id: item.id })}`;
 
@@ -3495,7 +3454,7 @@ async function buildHomeBlocksDetailed(client, userId, lang) {
     { type: "divider" },
   ];
 
-  const stats = getUserStats(userId);
+  const stats = await getUserStats(userId);
   blocks.push({
     type: "section",
     text: {
@@ -3511,7 +3470,7 @@ async function buildHomeBlocksDetailed(client, userId, lang) {
     },
   });
 
-  const roleStats = getUserRoleStats(userId);
+  const roleStats = await getUserRoleStats(userId);
   const roleLines =
     roleStats.length > 0
       ? roleStats
@@ -3536,7 +3495,7 @@ async function buildHomeBlocksDetailed(client, userId, lang) {
       text: { type: "mrkdwn", text: t(lang, "home.current_none") },
     });
   } else {
-    const channelStats = getUserChannelStats(userId, game.channelId);
+    const channelStats = await getUserChannelStats(userId, game.channelId);
     blocks.push({
       type: "section",
       text: {
@@ -3645,8 +3604,8 @@ async function buildHomeViewBilingualDetailed(client, userId, primaryLang) {
 }
 
 async function buildTelegramHomeText(userId, lang) {
-  const stats = getUserStats(userId);
-  const roleStats = getUserRoleStats(userId);
+  const stats = await getUserStats(userId);
+  const roleStats = await getUserRoleStats(userId);
   const roleLines =
     roleStats.length > 0
       ? roleStats
@@ -3712,7 +3671,7 @@ async function buildTelegramHomeText(userId, lang) {
 
 async function publishHomeForUser(client, userId) {
   if (!userId) return;
-  const langInfo = getUserLangInfo(userId);
+  const langInfo = await getUserLangInfo(userId);
   const view = langInfo.explicit
     ? await buildHomeViewDetailed(client, userId, langInfo.lang)
     : await buildHomeViewBilingualDetailed(client, userId, DEFAULT_LANG);
@@ -4024,8 +3983,8 @@ function parseFindContext(action) {
   };
 }
 
-function getFindEntries(filter, lang, langFilter, platform) {
-  const rows = listListedChannels();
+async function getFindEntries(filter, lang, langFilter, platform) {
+  const rows = await listListedChannels();
   const entries = [];
   rows.forEach((row) => {
     const channelId = row.channel_id;
@@ -4078,8 +4037,8 @@ function getFindEntries(filter, lang, langFilter, platform) {
   return entries;
 }
 
-function buildFindGamesBlocks(lang, filter, page, langFilter) {
-  const entries = getFindEntries(filter, lang, langFilter, PLATFORM_SLACK);
+async function buildFindGamesBlocks(lang, filter, page, langFilter) {
+  const entries = await getFindEntries(filter, lang, langFilter, PLATFORM_SLACK);
   const totalPages = Math.max(1, Math.ceil(entries.length / FIND_PAGE_SIZE));
   const safePage = Math.min(Math.max(page, 0), totalPages - 1);
   const slice = entries.slice(
@@ -4183,8 +4142,8 @@ function buildFindGamesBlocks(lang, filter, page, langFilter) {
   return blocks;
 }
 
-function buildTelegramFindGamesMessage(lang, filter, page, langFilter) {
-  const entries = getFindEntries(filter, lang, langFilter, PLATFORM_TELEGRAM);
+async function buildTelegramFindGamesMessage(lang, filter, page, langFilter) {
+  const entries = await getFindEntries(filter, lang, langFilter, PLATFORM_TELEGRAM);
   const totalPages = Math.max(1, Math.ceil(entries.length / FIND_PAGE_SIZE));
   const safePage = Math.min(Math.max(page, 0), totalPages - 1);
   const slice = entries.slice(
@@ -4254,7 +4213,7 @@ function buildTelegramFindGamesMessage(lang, filter, page, langFilter) {
 }
 
 async function buildTelegramMyChannelsMessage(userId, lang, page) {
-  const rows = listOwnedChannels(userId);
+  const rows = await listOwnedChannels(userId);
   const totalPages = Math.max(1, Math.ceil(rows.length / MY_CHANNELS_PAGE_SIZE));
   const safePage = Math.min(Math.max(page, 0), totalPages - 1);
   const slice = rows.slice(
@@ -4312,8 +4271,9 @@ async function buildTelegramMyChannelsMessage(userId, lang, page) {
   return { text, reply_markup };
 }
 
-function buildTelegramChannelEditMessage(channelId, lang) {
-  const pref = getChannelPref(channelId) || ensureChannelPref(channelId);
+async function buildTelegramChannelEditMessage(channelId, lang) {
+  const pref =
+    (await getChannelPref(channelId)) || (await ensureChannelPref(channelId));
   const settings = parseSettingsJson(pref?.settings_json);
   const channelLang = getChannelLangFromSettings(settings);
   const listed = Boolean(pref?.listed);
@@ -4437,7 +4397,7 @@ function normalizeChannelSettings(settings) {
 }
 
 async function buildMyChannelsBlocks(client, userId, lang, page) {
-  const rows = listOwnedChannels(userId);
+  const rows = await listOwnedChannels(userId);
   const totalPages = Math.max(1, Math.ceil(rows.length / MY_CHANNELS_PAGE_SIZE));
   const safePage = Math.min(Math.max(page, 0), totalPages - 1);
   const slice = rows.slice(
@@ -4796,14 +4756,14 @@ function isBotJoinEvent(event) {
 
 async function promptChannelListing(client, channelId, inviterId, channelType) {
   if (!channelId) return;
-  const existing = getChannelPref(channelId);
+  const existing = await getChannelPref(channelId);
   if (existing?.prompted_at) return;
 
-  markChannelPrompted(channelId, { channelType, listedBy: inviterId });
+  await markChannelPrompted(channelId, { channelType, listedBy: inviterId });
 
   let dmSent = false;
   if (inviterId) {
-    const lang = getUserLang(inviterId);
+    const lang = await getUserLang(inviterId);
     const text = t(lang, "find.prompt_public", {
       channel: channelMention(channelId),
     });
@@ -4837,10 +4797,10 @@ async function promptChannelListing(client, channelId, inviterId, channelType) {
 async function promptTelegramChannelListing(chatId, inviterId, chatType) {
   if (!telegramBot || !chatId) return;
   const channelKey = makeChannelKey(PLATFORM_TELEGRAM, chatId);
-  const existing = getChannelPref(channelKey);
+  const existing = await getChannelPref(channelKey);
   if (existing?.prompted_at) return;
 
-  markChannelPrompted(channelKey, {
+  await markChannelPrompted(channelKey, {
     channelType: chatType || null,
     listedBy: inviterId || null,
   });
@@ -4920,8 +4880,8 @@ async function editTelegramMessage(chatId, messageId, text, reply_markup) {
 }
 
 async function sendDevPanel(client, userId) {
-  const lang = getUserLang(userId);
-  const state = getMaintenanceState();
+  const lang = await getUserLang(userId);
+  const state = await getMaintenanceState();
   if (isTelegramKey(userId)) {
     const status = state.enabled
       ? t(lang, "dev.panel.status_on")
@@ -4961,15 +4921,15 @@ function getActiveGames() {
 }
 
 async function maybeNotifyMaintenanceDone(client) {
-  const state = getMaintenanceState();
+  const state = await getMaintenanceState();
   if (!state.enabled || state.notified) return;
   if (!DEV_USER_ID) return;
   if (getActiveGames().length > 0) return;
   if (!client && !isTelegramKey(DEV_USER_ID)) return;
 
-  const lang = getUserLang(DEV_USER_ID);
+  const lang = await getUserLang(DEV_USER_ID);
   await sendInteractiveDM(client, DEV_USER_ID, t(lang, "maintenance.done"));
-  setMaintenanceState({ ...state, notified: true });
+  await setMaintenanceState({ ...state, notified: true });
 }
 
 async function closeAllLobbiesForMaintenance(client) {
@@ -5174,7 +5134,7 @@ function getLastWordsEntry(userId) {
 
 async function requestLastWords(client, game, userId) {
   if (isTestUserId(userId)) return;
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   trackLastWords(game, userId);
   await sendInteractiveDM(
     client,
@@ -5300,7 +5260,7 @@ async function notifyEphemeral(client, channelId, userId, text) {
 }
 
 async function notifyEphemeralLocalized(client, channelId, userId, key, params) {
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   await notifyEphemeral(client, channelId, userId, t(lang, key, params));
 }
 
@@ -5500,7 +5460,7 @@ async function sendPhaseWarning(client, game, warnMs) {
 
 async function sendReminder(client, userId, channelId, actionKey) {
   if (isTestUserId(userId)) return;
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   const text = t(lang, "reminder.text", {
     action: t(lang, `reminder.${actionKey}`),
     channel: channelMention(channelId),
@@ -5727,7 +5687,7 @@ async function startGameFromLobby(client, game, announceText) {
 
 async function resolveLobbyTimeout(client, game) {
   if (game.state !== "lobby") return;
-  if (isMaintenanceEnabled()) {
+  if (await isMaintenanceEnabled()) {
     await closeLobby(client, game, { key: "maintenance.lobby_closed" });
     return;
   }
@@ -5799,8 +5759,8 @@ async function endGameWithWinner(client, game, winner) {
   );
 
   const players = Object.values(game.players || {});
-  players.forEach((player) => {
-    if (player.isTest) return;
+  for (const player of players) {
+    if (player.isTest) continue;
     const role = player.role || "town";
     let isWin = false;
     if (winner === "mafia") {
@@ -5813,17 +5773,17 @@ async function endGameWithWinner(client, game, winner) {
     } else if (winner === "jester") {
       isWin = role === "jester";
     }
-    updateUserStats(player.id, isWin);
-    updateUserChannelStats(player.id, game.channelId, isWin);
+    await updateUserStats(player.id, isWin);
+    await updateUserChannelStats(player.id, game.channelId, isWin);
     if (role !== "stalker") {
-      updateUserRoleStats(player.id, role, isWin);
+      await updateUserRoleStats(player.id, role, isWin);
     }
-  });
+  }
 
   await finalizeDashboard(client, game);
   clearPhaseTimers(game.channelId);
   gameCache.delete(game.channelId);
-  deleteGame(game.channelId);
+  await deleteGame(game.channelId);
   await updateHomeForUsers(
     client,
     players.map((player) => player.id)
@@ -5952,7 +5912,7 @@ async function resolveNight(client, game, autoApplied) {
     if (!game.players[killedId]) continue;
     game.players[killedId].alive = false;
     if (killedId === game.roles.stalkerId) {
-      recordStalkerLoss(game);
+      await recordStalkerLoss(game);
     }
     await requestLastWords(client, game, killedId);
     const invited = await inviteToGraveyard(client, game, killedId);
@@ -5987,14 +5947,14 @@ async function resolveNight(client, game, autoApplied) {
         killerId = randomChoice(mafiaVoters) || randomChoice(mafiaAlive);
       }
       if (killerId && !isTestUserId(game.roles.bumId)) {
-        const bumLang = getUserLang(game.roles.bumId);
+        const bumLang = await getUserLang(game.roles.bumId);
         await sendInteractiveDM(client, game.roles.bumId, t(bumLang, "bum.witness", {
           killer: mention(killerId),
           victim: mention(bumTarget),
         }));
       }
     } else if (bumTarget && !isTestUserId(game.roles.bumId)) {
-      const bumLang = getUserLang(game.roles.bumId);
+      const bumLang = await getUserLang(game.roles.bumId);
       await sendInteractiveDM(client, game.roles.bumId, t(bumLang, "bum.nothing"));
     }
   }
@@ -6006,7 +5966,7 @@ async function resolveNight(client, game, autoApplied) {
         (id) => stalkerKillIds.has(id) && game.players[id]?.role === targetRole
       );
       if (stalkerSuccess) {
-        recordStalkerWin(game);
+        await recordStalkerWin(game);
         await assignNewStalkerTarget(client, game, "stalker.success");
       } else {
         const aliveHasRole = getAlivePlayers(game).some(
@@ -6111,7 +6071,7 @@ async function resolveDay(client, game, autoApplied) {
       );
     }
     if (executedId === game.roles.stalkerId) {
-      recordStalkerLoss(game);
+      await recordStalkerLoss(game);
     }
     await maybePromoteSergeant(client, game);
     if (game.roles.stalkerId && isPlayerAlive(game, game.roles.stalkerId)) {
@@ -6204,7 +6164,7 @@ async function sendNightPrompts(client, game) {
     if (!isPlayerAlive(game, mafiaId)) continue;
     if (isTestUserId(mafiaId)) continue;
     if (mafiaChoices.length === 0) continue;
-    const lang = getUserLang(mafiaId);
+    const lang = await getUserLang(mafiaId);
 
     const promptText = t(lang, "prompt.mafia", {
       channel: channelMention(game.channelId),
@@ -6233,7 +6193,7 @@ async function sendNightPrompts(client, game) {
 
   if (game.roles.doctorId && isPlayerAlive(game, game.roles.doctorId)) {
     if (!isTestUserId(game.roles.doctorId)) {
-      const lang = getUserLang(game.roles.doctorId);
+      const lang = await getUserLang(game.roles.doctorId);
       const promptText = t(lang, "prompt.doctor", {
         channel: channelMention(game.channelId),
       });
@@ -6253,7 +6213,7 @@ async function sendNightPrompts(client, game) {
 
   if (game.roles.detectiveId && isPlayerAlive(game, game.roles.detectiveId)) {
     if (!isTestUserId(game.roles.detectiveId)) {
-      const lang = getUserLang(game.roles.detectiveId);
+      const lang = await getUserLang(game.roles.detectiveId);
       const promptText = t(lang, "prompt.detective_mode", {
         channel: channelMention(game.channelId),
       });
@@ -6269,7 +6229,7 @@ async function sendNightPrompts(client, game) {
 
   if (game.roles.bodyguardId && isPlayerAlive(game, game.roles.bodyguardId)) {
     if (!isTestUserId(game.roles.bodyguardId)) {
-      const lang = getUserLang(game.roles.bodyguardId);
+      const lang = await getUserLang(game.roles.bodyguardId);
       const promptText = t(lang, "prompt.bodyguard", {
         channel: channelMention(game.channelId),
       });
@@ -6294,7 +6254,7 @@ async function sendNightPrompts(client, game) {
 
   if (game.roles.bumId && isPlayerAlive(game, game.roles.bumId)) {
     if (!isTestUserId(game.roles.bumId)) {
-      const lang = getUserLang(game.roles.bumId);
+      const lang = await getUserLang(game.roles.bumId);
       const promptText = t(lang, "prompt.bum", {
         channel: channelMention(game.channelId),
       });
@@ -6313,7 +6273,7 @@ async function sendNightPrompts(client, game) {
 
   if (game.roles.lawyerId && isPlayerAlive(game, game.roles.lawyerId)) {
     if (!isTestUserId(game.roles.lawyerId)) {
-      const lang = getUserLang(game.roles.lawyerId);
+      const lang = await getUserLang(game.roles.lawyerId);
       const promptText = t(lang, "prompt.lawyer", {
         channel: channelMention(game.channelId),
       });
@@ -6332,7 +6292,7 @@ async function sendNightPrompts(client, game) {
 
   if (game.roles.stalkerId && isPlayerAlive(game, game.roles.stalkerId)) {
     if (!isTestUserId(game.roles.stalkerId)) {
-      const lang = getUserLang(game.roles.stalkerId);
+      const lang = await getUserLang(game.roles.stalkerId);
       const targetRole = game.stalker?.targetRole;
       const roleText = targetRole
         ? roleLabel(targetRole, lang)
@@ -6373,7 +6333,7 @@ async function sendNightPromptsTelegram(game) {
     if (!isPlayerAlive(game, mafiaId)) continue;
     if (isTestUserId(mafiaId)) continue;
     if (!mafiaChoices.length) continue;
-    const lang = getUserLang(mafiaId);
+    const lang = await getUserLang(mafiaId);
     const promptText = t(lang, "prompt.mafia", {
       channel: channelMention(game.channelId),
     });
@@ -6399,7 +6359,7 @@ async function sendNightPromptsTelegram(game) {
 
   if (game.roles.doctorId && isPlayerAlive(game, game.roles.doctorId)) {
     if (!isTestUserId(game.roles.doctorId)) {
-      const lang = getUserLang(game.roles.doctorId);
+      const lang = await getUserLang(game.roles.doctorId);
       const promptText = t(lang, "prompt.doctor", {
         channel: channelMention(game.channelId),
       });
@@ -6419,7 +6379,7 @@ async function sendNightPromptsTelegram(game) {
 
   if (game.roles.detectiveId && isPlayerAlive(game, game.roles.detectiveId)) {
     if (!isTestUserId(game.roles.detectiveId)) {
-      const lang = getUserLang(game.roles.detectiveId);
+      const lang = await getUserLang(game.roles.detectiveId);
       const promptText = t(lang, "prompt.detective_mode", {
         channel: channelMention(game.channelId),
       });
@@ -6432,7 +6392,7 @@ async function sendNightPromptsTelegram(game) {
 
   if (game.roles.bodyguardId && isPlayerAlive(game, game.roles.bodyguardId)) {
     if (!isTestUserId(game.roles.bodyguardId)) {
-      const lang = getUserLang(game.roles.bodyguardId);
+      const lang = await getUserLang(game.roles.bodyguardId);
       const promptText = t(lang, "prompt.bodyguard", {
         channel: channelMention(game.channelId),
       });
@@ -6452,7 +6412,7 @@ async function sendNightPromptsTelegram(game) {
 
   if (game.roles.bumId && isPlayerAlive(game, game.roles.bumId)) {
     if (!isTestUserId(game.roles.bumId)) {
-      const lang = getUserLang(game.roles.bumId);
+      const lang = await getUserLang(game.roles.bumId);
       const promptText = t(lang, "prompt.bum", {
         channel: channelMention(game.channelId),
       });
@@ -6472,7 +6432,7 @@ async function sendNightPromptsTelegram(game) {
 
   if (game.roles.lawyerId && isPlayerAlive(game, game.roles.lawyerId)) {
     if (!isTestUserId(game.roles.lawyerId)) {
-      const lang = getUserLang(game.roles.lawyerId);
+      const lang = await getUserLang(game.roles.lawyerId);
       const promptText = t(lang, "prompt.lawyer", {
         channel: channelMention(game.channelId),
       });
@@ -6492,7 +6452,7 @@ async function sendNightPromptsTelegram(game) {
 
   if (game.roles.stalkerId && isPlayerAlive(game, game.roles.stalkerId)) {
     if (!isTestUserId(game.roles.stalkerId)) {
-      const lang = getUserLang(game.roles.stalkerId);
+      const lang = await getUserLang(game.roles.stalkerId);
       const targetRole = game.stalker?.targetRole;
       const roleText = targetRole
         ? roleLabel(targetRole, lang)
@@ -6531,7 +6491,7 @@ async function sendDayPrompts(client, game) {
 
   for (const userId of aliveIds) {
     if (isTestUserId(userId)) continue;
-    const lang = getUserLang(userId);
+    const lang = await getUserLang(userId);
     const promptText = t(lang, "prompt.day", {
       channel: channelMention(game.channelId),
     });
@@ -6566,7 +6526,7 @@ async function sendDayPromptsTelegram(game) {
 
   for (const userId of aliveIds) {
     if (isTestUserId(userId)) continue;
-    const lang = getUserLang(userId);
+    const lang = await getUserLang(userId);
     const promptText = t(lang, "prompt.day", {
       channel: channelMention(game.channelId),
     });
@@ -6727,7 +6687,7 @@ app.event("app_mention", async ({ event, say, client }) => {
   const channelId = event.channel;
   const userId = event.user;
 
-  if (isMaintenanceEnabled()) {
+  if (await isMaintenanceEnabled()) {
     await respondMaintenanceInChannel(client, event);
     return;
   }
@@ -6757,7 +6717,7 @@ app.event("app_mention", async ({ event, say, client }) => {
           );
           break;
         }
-        setUserLang(userId, choice);
+        await setUserLang(userId, choice);
         const key = choice === "ru" ? "dm.lang_set_ru" : "dm.lang_set_en";
         await notifyEphemeral(client, channelId, userId, t(choice, key));
         break;
@@ -6785,7 +6745,7 @@ app.event("app_mention", async ({ event, say, client }) => {
           break;
         }
         game = createLobby(channelId, userId);
-        const channelSettings = getChannelSettings(channelId);
+        const channelSettings = await getChannelSettings(channelId);
         applyChannelSettingsToGame(game, channelSettings);
         gameCache.set(channelId, game);
         saveGame(game);
@@ -6935,7 +6895,7 @@ app.event("app_mention", async ({ event, say, client }) => {
           );
           break;
         }
-        const lang = getUserLang(userId);
+        const lang = await getUserLang(userId);
         const alive = await listAliveDisplay(client, game, lang);
         await notifyEphemeralLocalized(
           client,
@@ -7140,7 +7100,7 @@ app.event("member_joined_channel", async ({ event, client }) => {
 
 async function sendRoleDM(client, game, userId, role) {
   if (isTestUserId(userId)) return;
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   const text = t(lang, "action.role_dm", {
     channel: channelMention(game.channelId),
     role: roleLabel(role, lang),
@@ -7179,7 +7139,7 @@ async function sendTestRoleSummary(client, game) {
   if (testPlayers.length === 0) return;
   const controllerId = game.test?.controllerId || DEV_USER_ID;
   if (!controllerId) return;
-  const lang = getUserLang(controllerId);
+  const lang = await getUserLang(controllerId);
   const lines = testPlayers
     .map(
       (player) =>
@@ -7198,7 +7158,7 @@ async function sendTestActionReminder(client, game, phase) {
   if (testPlayers.length === 0) return;
   const controllerId = game.test?.controllerId || DEV_USER_ID;
   if (!controllerId) return;
-  const lang = getUserLang(controllerId);
+  const lang = await getUserLang(controllerId);
 
   if (phase === "night") {
     const mafia = game.roles.mafiaIds
@@ -7266,7 +7226,7 @@ app.action(
   async ({ ack, body, action, client }) => {
     await ack();
     const actorId = body.user.id;
-    const actorLang = getUserLang(actorId);
+    const actorLang = await getUserLang(actorId);
     const channelId = action?.value || parseActionContext(action).channelId;
 
     if (!channelId) {
@@ -7345,7 +7305,7 @@ app.action(
     const { actionId, channelId } = parseActionContext(action);
     const targetId = action?.selected_option?.value || action?.value;
     const actorId = body.user.id;
-    const actorLang = getUserLang(actorId);
+    const actorLang = await getUserLang(actorId);
 
     if (!channelId || !targetId) {
       await updateActionMessage(client, body, t(actorLang, "action.failed"));
@@ -7596,7 +7556,7 @@ app.action(
           isPlayerAlive(game, sergeantId) &&
           !isTestUserId(sergeantId)
         ) {
-          const serLang = getUserLang(sergeantId);
+          const serLang = await getUserLang(sergeantId);
           const serResult = isDetectiveSeesMafia(game, targetId)
             ? t(serLang, "action.result_mafia")
             : t(serLang, "action.result_not_mafia");
@@ -7806,7 +7766,7 @@ app.action(
   async ({ ack, body, action, client }) => {
     await ack();
     const actorId = body.user.id;
-    const actorLang = getUserLang(actorId);
+    const actorLang = await getUserLang(actorId);
     const { actionType, channelId, page } = parseActionContext(action);
 
     if (!channelId) {
@@ -8064,7 +8024,7 @@ app.action(
       return;
     }
 
-    if (isMaintenanceEnabled()) {
+    if (await isMaintenanceEnabled()) {
       await notifyEphemeralLocalized(
         client,
         channelId,
@@ -8261,7 +8221,7 @@ app.action(
     const userId = body.user.id;
     const choice =
       action.action_id === ACTIONS.LANG_SELECT_RU ? "ru" : "en";
-    const langInfo = getUserLangInfo(userId);
+    const langInfo = await getUserLangInfo(userId);
 
     if (langInfo.explicit) {
       await updateActionMessage(
@@ -8272,7 +8232,7 @@ app.action(
       return;
     }
 
-    setUserLang(userId, choice);
+    await setUserLang(userId, choice);
     const text =
       choice === "ru"
         ? t("ru", "dm.lang_set_ru")
@@ -8284,7 +8244,7 @@ app.action(
 app.action(ACTIONS.ROLE_HELP, async ({ ack, body, action, client }) => {
   await ack();
   const userId = body.user.id;
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   const role = action?.value || "town";
   const baseText = body?.message?.text || t(lang, "action.role_dm", {
     channel: "",
@@ -8313,7 +8273,7 @@ app.action(
   async ({ ack, body, action, client }) => {
     await ack();
     const userId = body.user.id;
-    const lang = getUserLang(userId);
+    const lang = await getUserLang(userId);
     let text = t(lang, "dm.help_intro");
     if (action.action_id === ACTIONS.DM_HELP_ADD) text = t(lang, "dm.help_add");
     if (action.action_id === ACTIONS.DM_HELP_COMMANDS)
@@ -8329,16 +8289,16 @@ app.action(
 app.action(ACTIONS.DEV_MAINT_TOGGLE, async ({ ack, body, client }) => {
   await ack();
   const userId = body.user.id;
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
 
   if (!isDevUser(userId)) {
     await updateActionMessage(client, body, t(lang, "dev.not_authorized"));
     return;
   }
 
-  const state = getMaintenanceState();
+  const state = await getMaintenanceState();
   const enabled = !state.enabled;
-  setMaintenanceState({
+  await setMaintenanceState({
     enabled,
     by: userId,
     requested_at: now(),
@@ -8358,9 +8318,9 @@ app.action(ACTIONS.DEV_MAINT_TOGGLE, async ({ ack, body, client }) => {
 app.action(ACTIONS.FIND_GAMES_OPEN, async ({ ack, body, client }) => {
   await ack();
   const userId = body.user.id;
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   const convo = await client.conversations.open({ users: userId });
-  const blocks = buildFindGamesBlocks(lang, "recruiting", 0, "all");
+  const blocks = await buildFindGamesBlocks(lang, "recruiting", 0, "all");
   await client.chat.postMessage({
     channel: convo.channel.id,
     text: t(lang, "find.title"),
@@ -8373,7 +8333,7 @@ app.action(
   async ({ ack, body, action, client }) => {
     await ack();
     const userId = body.user.id;
-    const lang = getUserLang(userId);
+    const lang = await getUserLang(userId);
     const ctx = parseFindContext(action) || {
       filter: "recruiting",
       lang: "all",
@@ -8407,7 +8367,7 @@ app.action(
       page -= 1;
     }
 
-    const blocks = buildFindGamesBlocks(lang, filter, page, langFilter);
+    const blocks = await buildFindGamesBlocks(lang, filter, page, langFilter);
     await updateActionMessage(client, body, t(lang, "find.title"), blocks);
   }
 );
@@ -8415,7 +8375,7 @@ app.action(
 app.action(ACTIONS.FAQ_OPEN, async ({ ack, body, client }) => {
   await ack();
   const userId = body.user.id;
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   const view = buildFaqListView(lang, 0);
   if (body.view && body.view.type === "modal") {
     await client.views.push({ trigger_id: body.trigger_id, view });
@@ -8429,7 +8389,7 @@ app.action(
   async ({ ack, body, action, client }) => {
     await ack();
     const userId = body.user.id;
-    const lang = getUserLang(userId);
+    const lang = await getUserLang(userId);
     const currentPage = getFaqPageFromView(body.view);
     const nextPage =
       action.action_id === ACTIONS.FAQ_PAGE_NEXT
@@ -8451,7 +8411,7 @@ app.action(
 app.action(ACTIONS.FAQ_TOPIC, async ({ ack, body, action, client }) => {
   await ack();
   const userId = body.user.id;
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   const faqId = action?.value;
   const page = body.view ? getFaqPageFromView(body.view) : 0;
   const item = getFaqItemById(faqId, lang);
@@ -8477,7 +8437,7 @@ app.action(ACTIONS.FAQ_TOPIC, async ({ ack, body, action, client }) => {
 app.action(ACTIONS.FAQ_BACK, async ({ ack, body, client }) => {
   await ack();
   const userId = body.user.id;
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   const page = getFaqPageFromView(body.view);
   const view = buildFaqListView(lang, page);
   if (body.view) {
@@ -8494,7 +8454,7 @@ app.action(ACTIONS.FAQ_BACK, async ({ ack, body, client }) => {
 app.action(ACTIONS.MY_CHANNELS_OPEN, async ({ ack, body, client }) => {
   await ack();
   const userId = body.user.id;
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   const convo = await client.conversations.open({ users: userId });
   const blocks = await buildMyChannelsBlocks(client, userId, lang, 0);
   await client.chat.postMessage({
@@ -8509,7 +8469,7 @@ app.action(
   async ({ ack, body, action, client }) => {
     await ack();
     const userId = body.user.id;
-    const lang = getUserLang(userId);
+    const lang = await getUserLang(userId);
     const ctx = parseMyChannelsContext(action) || { page: 0 };
     let page = ctx.page;
     if (action.action_id === ACTIONS.MY_CHANNELS_PAGE_NEXT) page += 1;
@@ -8522,14 +8482,14 @@ app.action(
 app.action(ACTIONS.CHANNEL_EDIT_OPEN, async ({ ack, body, action, client }) => {
   await ack();
   const userId = body.user.id;
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   const channelId = action?.value;
   if (!channelId) {
     await updateActionMessage(client, body, t(lang, "err.channel_unknown"));
     return;
   }
 
-  const pref = getChannelPref(channelId);
+  const pref = await getChannelPref(channelId);
   if (!pref || pref.listed_by !== userId) {
     await updateActionMessage(client, body, t(lang, "my_channels.not_owner"));
     return;
@@ -8547,7 +8507,7 @@ app.action(ACTIONS.CHANNEL_EDIT_OPEN, async ({ ack, body, action, client }) => {
 
 app.view("channel_edit", async ({ ack, body, view, client }) => {
   const userId = body.user.id;
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   let channelId = null;
   try {
     const meta = JSON.parse(view.private_metadata || "{}");
@@ -8561,7 +8521,7 @@ app.view("channel_edit", async ({ ack, body, view, client }) => {
     return;
   }
 
-  const pref = getChannelPref(channelId);
+  const pref = await getChannelPref(channelId);
   if (!pref || pref.listed_by !== userId) {
     await ack();
     const convo = await client.conversations.open({ users: userId });
@@ -8643,7 +8603,7 @@ app.view("channel_edit", async ({ ack, body, view, client }) => {
   };
 
   const listed = privacy === "public" && !isPrivate;
-  setChannelListing(channelId, listed, {
+  await setChannelListing(channelId, listed, {
     channelType,
     listedBy: userId,
     settingsJson: JSON.stringify(settings),
@@ -8671,14 +8631,15 @@ app.action(
   async ({ ack, body, action, client }) => {
     await ack();
     const userId = body.user.id;
-    const lang = getUserLang(userId);
+    const lang = await getUserLang(userId);
     const channelId = action?.value;
     if (!channelId) {
       await updateActionMessage(client, body, t(lang, "err.channel_unknown"));
       return;
     }
 
-    const pref = getChannelPref(channelId) || ensureChannelPref(channelId);
+    const pref =
+      (await getChannelPref(channelId)) || (await ensureChannelPref(channelId));
     const channelType = pref?.channel_type || null;
     const isPrivate = channelType === "group";
     const isPublicAction = action.action_id === ACTIONS.CHANNEL_LIST_PUBLIC;
@@ -8686,7 +8647,7 @@ app.action(
     const channel = channelMention(channelId);
 
     if (isPublicAction && isPrivate) {
-      setChannelListing(channelId, 0, { channelType, listedBy: userId });
+      await setChannelListing(channelId, 0, { channelType, listedBy: userId });
       const text = isDM
         ? t(lang, "find.private_not_allowed")
         : `${t("en", "find.private_not_allowed")}\n${t(
@@ -8698,7 +8659,7 @@ app.action(
     }
 
     const listed = isPublicAction;
-    setChannelListing(channelId, listed, { channelType, listedBy: userId });
+    await setChannelListing(channelId, listed, { channelType, listedBy: userId });
     const text = isDM
       ? t(lang, listed ? "find.set_public" : "find.set_private", { channel })
       : `${t("en", listed ? "find.set_public" : "find.set_private", {
@@ -8752,7 +8713,7 @@ app.event("message", async ({ event, client }) => {
 
   const command = args[0].toLowerCase();
   const userId = event.user;
-  const langInfo = getUserLangInfo(userId);
+  const langInfo = await getUserLangInfo(userId);
   const userLang = langInfo.lang;
 
   if (command === "dev") {
@@ -8784,7 +8745,7 @@ app.event("message", async ({ event, client }) => {
       });
       return;
     }
-    const updated = setUserLang(userId, choice);
+    const updated = await setUserLang(userId, choice);
     await client.chat.postMessage({
       channel: event.channel,
       text:
@@ -8830,7 +8791,7 @@ app.event("message", async ({ event, client }) => {
     return;
   }
 
-  if (isMaintenanceEnabled() && !isDevUser(userId)) {
+  if (await isMaintenanceEnabled() && !isDevUser(userId)) {
     const allowCommands = [
       "whisper",
       "vote",
@@ -8910,7 +8871,7 @@ app.event("message", async ({ event, client }) => {
         }
         if (!game) {
           game = createLobby(channelId, userId);
-          const channelSettings = getChannelSettings(channelId);
+          const channelSettings = await getChannelSettings(channelId);
           applyChannelSettingsToGame(game, channelSettings);
           gameCache.set(channelId, game);
           created = true;
@@ -9796,7 +9757,7 @@ app.event("message", async ({ event, client }) => {
         isPlayerAlive(game, sergeantId) &&
         !isTestUserId(sergeantId)
       ) {
-        const serLang = getUserLang(sergeantId);
+        const serLang = await getUserLang(sergeantId);
         const serResult = isDetectiveSeesMafia(game, targetId)
           ? t(serLang, "dm_cmd.result_mafia")
           : t(serLang, "dm_cmd.result_not_mafia");
@@ -9973,7 +9934,7 @@ async function handleTelegramDetectiveMode(ctx, data) {
   const rawChatId = data.chatId;
   const channelId = makeChannelKey(PLATFORM_TELEGRAM, rawChatId);
   const actorId = getTelegramUserKeyFromCtx(ctx);
-  const actorLang = getUserLang(actorId);
+  const actorLang = await getUserLang(actorId);
 
   if (!rawChatId) {
     await answerTelegramCallback(ctx, t(actorLang, "action.failed"), true);
@@ -10032,7 +9993,7 @@ async function handleTelegramPageAction(ctx, data) {
   const actionType = data.target;
   const channelId = makeChannelKey(PLATFORM_TELEGRAM, rawChatId);
   const actorId = getTelegramUserKeyFromCtx(ctx);
-  const actorLang = getUserLang(actorId);
+  const actorLang = await getUserLang(actorId);
 
   if (!rawChatId || !actionType) {
     await answerTelegramCallback(ctx, t(actorLang, "action.failed"), true);
@@ -10174,7 +10135,7 @@ async function handleTelegramPlayerAction(ctx, data) {
   const rawChatId = data.chatId;
   const channelId = makeChannelKey(PLATFORM_TELEGRAM, rawChatId);
   const actorId = getTelegramUserKeyFromCtx(ctx);
-  const actorLang = getUserLang(actorId);
+  const actorLang = await getUserLang(actorId);
   const targetId = data.target;
 
   if (!rawChatId || !targetId) {
@@ -10335,7 +10296,7 @@ async function handleTelegramPlayerAction(ctx, data) {
         isPlayerAlive(game, sergeantId) &&
         !isTestUserId(sergeantId)
       ) {
-        const serLang = getUserLang(sergeantId);
+        const serLang = await getUserLang(sergeantId);
         const serResult = isDetectiveSeesMafia(game, targetId)
           ? t(serLang, "action.result_mafia")
           : t(serLang, "action.result_not_mafia");
@@ -10474,14 +10435,14 @@ async function handleTelegramLobbyAction(ctx, data) {
   const rawChatId = data.chatId || ctx?.chat?.id;
   const channelId = makeChannelKey(PLATFORM_TELEGRAM, rawChatId);
   const userId = getTelegramUserKeyFromCtx(ctx);
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
 
   if (!rawChatId) {
     await answerTelegramCallback(ctx, t(lang, "err.channel_unknown"), true);
     return;
   }
 
-  if (isMaintenanceEnabled() && !isDevUser(userId)) {
+  if (await isMaintenanceEnabled() && !isDevUser(userId)) {
     await answerTelegramCallback(ctx, t(lang, "maintenance.blocked"), true);
     return;
   }
@@ -10633,8 +10594,9 @@ async function handleTelegramChannelListingAction(ctx, data) {
   const rawChatId = data.chatId;
   const channelId = makeChannelKey(PLATFORM_TELEGRAM, rawChatId);
   const userId = getTelegramUserKeyFromCtx(ctx);
-  const lang = getUserLang(userId);
-  const pref = getChannelPref(channelId) || ensureChannelPref(channelId);
+  const lang = await getUserLang(userId);
+  const pref =
+    (await getChannelPref(channelId)) || (await ensureChannelPref(channelId));
 
   if (!rawChatId) {
     await answerTelegramCallback(ctx, t(lang, "err.channel_unknown"), true);
@@ -10646,7 +10608,7 @@ async function handleTelegramChannelListingAction(ctx, data) {
   const isPublicChat = Boolean(chatInfo?.username);
   if (isPublicAction && !isPublicChat) {
     await updateTelegramActionMessage(ctx, t(lang, "find.private_not_allowed"));
-    setChannelListing(channelId, 0, {
+    await setChannelListing(channelId, 0, {
       channelType: pref?.channel_type || chatInfo?.type || null,
       listedBy: userId,
     });
@@ -10654,7 +10616,7 @@ async function handleTelegramChannelListingAction(ctx, data) {
     return;
   }
 
-  setChannelListing(channelId, isPublicAction, {
+  await setChannelListing(channelId, isPublicAction, {
     channelType: pref?.channel_type || chatInfo?.type || null,
     listedBy: userId,
   });
@@ -10671,8 +10633,8 @@ async function handleTelegramChannelLangAction(ctx, data) {
   const rawChatId = data.chatId;
   const channelId = makeChannelKey(PLATFORM_TELEGRAM, rawChatId);
   const userId = getTelegramUserKeyFromCtx(ctx);
-  const lang = getUserLang(userId);
-  const pref = getChannelPref(channelId);
+  const lang = await getUserLang(userId);
+  const pref = await getChannelPref(channelId);
 
   if (!pref || pref.listed_by !== userId) {
     await answerTelegramCallback(ctx, t(lang, "my_channels.not_owner"), true);
@@ -10681,10 +10643,10 @@ async function handleTelegramChannelLangAction(ctx, data) {
 
   const newLang = data.action === ACTIONS.CHANNEL_LANG_RU ? "ru" : "en";
   const settings = {
-    ...getChannelSettings(channelId),
+    ...(await getChannelSettings(channelId)),
     channelLang: newLang,
   };
-  setChannelSettings(channelId, settings, { listedBy: pref.listed_by });
+  await setChannelSettings(channelId, settings, { listedBy: pref.listed_by });
 
   const game = getGame(channelId);
   if (game && game.state === "lobby") {
@@ -10695,14 +10657,14 @@ async function handleTelegramChannelLangAction(ctx, data) {
     saveGame(game);
   }
 
-  const { text, reply_markup } = buildTelegramChannelEditMessage(channelId, lang);
+  const { text, reply_markup } = await buildTelegramChannelEditMessage(channelId, lang);
   await updateTelegramActionMessage(ctx, text, reply_markup);
   await answerTelegramCallback(ctx);
 }
 
 async function handleTelegramMyChannelsAction(ctx, data) {
   const userId = getTelegramUserKeyFromCtx(ctx);
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   const page = data.page || 0;
 
   if (data.action === ACTIONS.MY_CHANNELS_OPEN) {
@@ -10722,12 +10684,12 @@ async function handleTelegramMyChannelsAction(ctx, data) {
 
   if (data.action === ACTIONS.CHANNEL_EDIT_OPEN) {
     const channelId = makeChannelKey(PLATFORM_TELEGRAM, data.chatId);
-    const pref = getChannelPref(channelId);
+    const pref = await getChannelPref(channelId);
     if (!pref || pref.listed_by !== userId) {
       await answerTelegramCallback(ctx, t(lang, "my_channels.not_owner"), true);
       return;
     }
-    const { text, reply_markup } = buildTelegramChannelEditMessage(channelId, lang);
+    const { text, reply_markup } = await buildTelegramChannelEditMessage(channelId, lang);
     await updateTelegramActionMessage(ctx, text, reply_markup);
     await answerTelegramCallback(ctx);
   }
@@ -10735,7 +10697,7 @@ async function handleTelegramMyChannelsAction(ctx, data) {
 
 async function handleTelegramFindGamesAction(ctx, data) {
   const userId = getTelegramUserKeyFromCtx(ctx);
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   const currentFilter = data.chatId || "recruiting";
   const currentLang = data.target || "all";
   let filter = currentFilter;
@@ -10766,14 +10728,14 @@ async function handleTelegramFindGamesAction(ctx, data) {
     page += 1;
   }
 
-  const message = buildTelegramFindGamesMessage(lang, filter, page, langFilter);
+  const message = await buildTelegramFindGamesMessage(lang, filter, page, langFilter);
   await updateTelegramActionMessage(ctx, message.text, message.reply_markup);
   await answerTelegramCallback(ctx);
 }
 
 async function handleTelegramFaqAction(ctx, data) {
   const userId = getTelegramUserKeyFromCtx(ctx);
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   const page = data.page || 0;
 
   if (data.action === ACTIONS.FAQ_OPEN) {
@@ -10807,7 +10769,7 @@ async function handleTelegramFaqAction(ctx, data) {
 
 async function handleTelegramHelpAction(ctx, data) {
   const userId = getTelegramUserKeyFromCtx(ctx);
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   let text = t(lang, "dm.help_intro_tg");
   if (data.action === ACTIONS.DM_HELP_ADD) text = t(lang, "dm.help_add_tg");
   if (data.action === ACTIONS.DM_HELP_COMMANDS)
@@ -10823,7 +10785,7 @@ async function handleTelegramHelpAction(ctx, data) {
 
 async function handleTelegramRoleHelpAction(ctx, data) {
   const userId = getTelegramUserKeyFromCtx(ctx);
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
   const role = data.chatId;
   const helpKey = `role_help.${role}`;
   const helpText = t(lang, helpKey) || t(lang, "role_help.town");
@@ -10844,7 +10806,7 @@ async function handleTelegramRoleHelpAction(ctx, data) {
 async function handleTelegramLangSelect(ctx, data) {
   const userId = getTelegramUserKeyFromCtx(ctx);
   const choice = data.action === ACTIONS.LANG_SELECT_RU ? "ru" : "en";
-  const updated = setUserLang(userId, choice);
+  const updated = await setUserLang(userId, choice);
   const text =
     updated.lang === "ru" ? t("ru", "dm.lang_set_ru") : t("en", "dm.lang_set_en");
   await updateTelegramActionMessage(ctx, text, undefined);
@@ -10853,16 +10815,16 @@ async function handleTelegramLangSelect(ctx, data) {
 
 async function handleTelegramDevToggle(ctx) {
   const userId = getTelegramUserKeyFromCtx(ctx);
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
 
   if (!isDevUser(userId)) {
     await answerTelegramCallback(ctx, t(lang, "dev.not_authorized"), true);
     return;
   }
 
-  const state = getMaintenanceState();
+  const state = await getMaintenanceState();
   const enabled = !state.enabled;
-  setMaintenanceState({
+  await setMaintenanceState({
     enabled,
     by: userId,
     requested_at: now(),
@@ -10974,7 +10936,7 @@ async function handleTelegramCallback(ctx) {
       return;
     }
     const userId = getTelegramUserKeyFromCtx(ctx);
-    const lang = getUserLang(userId);
+    const lang = await getUserLang(userId);
     const message = await buildTelegramMyChannelsMessage(userId, lang, 0);
     await replyToTelegramMessage(ctx, message.text, message.reply_markup);
     await answerTelegramCallback(ctx);
@@ -11026,8 +10988,8 @@ async function handleTelegramCallback(ctx) {
 
   if (data.action === ACTIONS.FIND_GAMES_OPEN) {
     const userId = getTelegramUserKeyFromCtx(ctx);
-    const lang = getUserLang(userId);
-    const message = buildTelegramFindGamesMessage(lang, "recruiting", 0, "all");
+    const lang = await getUserLang(userId);
+    const message = await buildTelegramFindGamesMessage(lang, "recruiting", 0, "all");
     await replyToTelegramMessage(ctx, message.text, message.reply_markup);
     await answerTelegramCallback(ctx);
     return;
@@ -11035,7 +10997,7 @@ async function handleTelegramCallback(ctx) {
 
   if (data.action === ACTIONS.FAQ_OPEN) {
     const userId = getTelegramUserKeyFromCtx(ctx);
-    const lang = getUserLang(userId);
+    const lang = await getUserLang(userId);
     const message = buildTelegramFaqList(lang, 0);
     await replyToTelegramMessage(ctx, message.text, message.reply_markup);
     await answerTelegramCallback(ctx);
@@ -11047,10 +11009,10 @@ async function handleTelegramCallback(ctx) {
 
 async function handleTelegramPrivateCommand(ctx, command, args) {
   const userId = getTelegramUserKeyFromCtx(ctx);
-  const userLangInfo = getUserLangInfo(userId);
+  const userLangInfo = await getUserLangInfo(userId);
   const userLang = userLangInfo.lang;
 
-  if (isMaintenanceEnabled() && !isDevUser(userId)) {
+  if (await isMaintenanceEnabled() && !isDevUser(userId)) {
     const allowCommands = ["lang", "whisper"];
     const activeGame = getUserCurrentGame(userId);
     const hasActiveGame =
@@ -11081,7 +11043,7 @@ async function handleTelegramPrivateCommand(ctx, command, args) {
       await replyToTelegramMessage(ctx, t(userLang, "dm.lang_usage"));
       return;
     }
-    const updated = setUserLang(userId, choice);
+    const updated = await setUserLang(userId, choice);
     await replyToTelegramMessage(
       ctx,
       updated.lang === "ru" ? t("ru", "dm.lang_set_ru") : t("en", "dm.lang_set_en")
@@ -11105,7 +11067,7 @@ async function handleTelegramPrivateCommand(ctx, command, args) {
   }
 
   if (command === "find") {
-    const message = buildTelegramFindGamesMessage(userLang, "recruiting", 0, "all");
+    const message = await buildTelegramFindGamesMessage(userLang, "recruiting", 0, "all");
     await replyToTelegramMessage(ctx, message.text, message.reply_markup);
     return;
   }
@@ -11117,7 +11079,7 @@ async function handleTelegramPrivateCommand(ctx, command, args) {
   }
 
   if (command === "whisper") {
-    if (isMaintenanceEnabled() && !isDevUser(userId)) {
+    if (await isMaintenanceEnabled() && !isDevUser(userId)) {
       await replyToTelegramMessage(ctx, t(userLang, "maintenance.reply"));
       return;
     }
@@ -11182,7 +11144,7 @@ async function handleTelegramPrivateText(ctx) {
     return;
   }
 
-  const langInfo = getUserLangInfo(userId);
+  const langInfo = await getUserLangInfo(userId);
   const userLang = langInfo.lang;
 
   const pendingLastWords = getLastWordsEntry(userId);
@@ -11221,7 +11183,7 @@ async function handleTelegramPrivateText(ctx) {
     return;
   }
 
-  if (isMaintenanceEnabled() && !isDevUser(userId)) {
+  if (await isMaintenanceEnabled() && !isDevUser(userId)) {
     await replyToTelegramMessage(ctx, t(userLang, "maintenance.reply"));
     return;
   }
@@ -11237,9 +11199,9 @@ async function handleTelegramPrivateText(ctx) {
 async function handleTelegramGroupCommand(ctx, command, args) {
   const channelId = getTelegramChannelKeyFromCtx(ctx);
   const userId = getTelegramUserKeyFromCtx(ctx);
-  const lang = getUserLang(userId);
+  const lang = await getUserLang(userId);
 
-  if (isMaintenanceEnabled() && !isDevUser(userId)) {
+  if (await isMaintenanceEnabled() && !isDevUser(userId)) {
     await replyToTelegramMessage(ctx, t(lang, "maintenance.reply"));
     return;
   }
@@ -11268,7 +11230,7 @@ async function handleTelegramGroupCommand(ctx, command, args) {
         return;
       }
       game = createLobby(channelId, userId, PLATFORM_TELEGRAM);
-      const channelSettings = getChannelSettings(channelId);
+      const channelSettings = await getChannelSettings(channelId);
       applyChannelSettingsToGame(game, channelSettings);
       gameCache.set(channelId, game);
       saveGame(game);
@@ -11429,10 +11391,10 @@ async function handleTelegramGroupCommand(ctx, command, args) {
         }
         game.config.channelLang = choice;
         const settings = {
-          ...getChannelSettings(channelId),
+          ...(await getChannelSettings(channelId)),
           channelLang: choice,
         };
-        setChannelSettings(channelId, settings);
+        await setChannelSettings(channelId, settings);
       } else {
         const value = Number(args[1]);
         if (!value || Number.isNaN(value)) {
@@ -11575,7 +11537,7 @@ async function startTelegram() {
   telegramBot.command("start", async (ctx) => {
     if (!isTelegramPrivateChat(ctx)) return;
     const userId = getTelegramUserKeyFromCtx(ctx);
-    const langInfo = getUserLangInfo(userId);
+    const langInfo = await getUserLangInfo(userId);
     if (!langInfo.explicit && !languagePrompted.has(userId)) {
       languagePrompted.add(userId);
       const promptText = t("en", "dm.lang_prompt");
@@ -11593,7 +11555,7 @@ async function startTelegram() {
   telegramBot.command(["help"], async (ctx) => {
     if (!isTelegramPrivateChat(ctx)) {
       const userId = getTelegramUserKeyFromCtx(ctx);
-      const lang = getUserLang(userId);
+      const lang = await getUserLang(userId);
       await replyToTelegramMessage(ctx, t(lang, "help.commands"));
       return;
     }
@@ -11719,9 +11681,18 @@ async function startTelegram() {
               deleteErr?.message || deleteErr
             );
           }
-          await telegramBot.launch();
           telegramMode = "polling";
-          console.log("Telegram bot is running (polling).");
+          telegramBot
+            .launch()
+            .then(() => {
+              console.log("Telegram bot is running (polling).");
+            })
+            .catch((launchErr) => {
+              console.error(
+                "Telegram polling failed:",
+                launchErr?.message || launchErr
+              );
+            });
           return telegramMode;
         }
         const retryAfter =
@@ -11745,22 +11716,34 @@ async function startTelegram() {
     console.warn(
       "Telegram webhook failed after retries. Falling back to polling."
     );
-    await telegramBot.launch();
     telegramMode = "polling";
-    console.log("Telegram bot is running (polling).");
+    telegramBot
+      .launch()
+      .then(() => {
+        console.log("Telegram bot is running (polling).");
+      })
+      .catch((launchErr) => {
+        console.error("Telegram polling failed:", launchErr?.message || launchErr);
+      });
     return telegramMode;
   }
 
-  await telegramBot.launch();
   telegramMode = "polling";
-  console.log("Telegram bot is running (polling).");
+  telegramBot
+    .launch()
+    .then(() => {
+      console.log("Telegram bot is running (polling).");
+    })
+    .catch((launchErr) => {
+      console.error("Telegram polling failed:", launchErr?.message || launchErr);
+    });
   return telegramMode;
 }
 
-function restoreActiveGames() {
-  const games = loadAllGames();
-  const maintenanceEnabled = isMaintenanceEnabled();
-  games.forEach((game) => {
+async function restoreActiveGames() {
+  const games = await loadAllGames();
+  const maintenanceEnabled = await isMaintenanceEnabled();
+  for (const game of games) {
     normalizeGame(game);
     gameCache.set(game.channelId, game);
     let dirty = false;
@@ -11774,7 +11757,7 @@ function restoreActiveGames() {
         }
       });
     }
-    if (dirty) saveGame(game);
+    if (dirty) await saveGame(game);
     if (maintenanceEnabled && game.state === "lobby") {
       withChannelLock(game.channelId, async () => {
         const current = getGame(game.channelId);
@@ -11797,18 +11780,18 @@ function restoreActiveGames() {
           withChannelLock(game.channelId, async () => {
             await postOrUpdateLobbyPanel(app.client, game);
             await postOrUpdateDashboard(app.client, game);
-            saveGame(game);
+            await saveGame(game);
           });
         }
         if (game.state === "day" || game.state === "night") {
           withChannelLock(game.channelId, async () => {
             await postOrUpdateDashboard(app.client, game);
-            saveGame(game);
+            await saveGame(game);
           });
         }
       }
     }
-  });
+  }
 }
 
 (async () => {
@@ -11817,7 +11800,10 @@ function restoreActiveGames() {
     ? Number.isFinite(SLACK_PORT) && SLACK_PORT > 0
       ? SLACK_PORT
       : 3001
-    : PORT;
+    : Number.isFinite(SLACK_PORT) && SLACK_PORT > 0
+      ? SLACK_PORT
+      : 0;
+  await db.initDb();
   await app.start(slackPort);
   if (useTelegramWebhook) {
     console.log(
@@ -11834,7 +11820,8 @@ function restoreActiveGames() {
   if (telegramMode !== "webhook") {
     startHealthServer();
   }
-  restoreActiveGames();
+  await restoreActiveGames();
   await maybeNotifyMaintenanceDone(app.client);
   console.log("Mafia bot is running (Socket Mode).");
 })();
+

@@ -1,6 +1,6 @@
 ﻿# Mafia Slack Bot
 
-Полноценный мафия-бот для Slack (Socket Mode) с анонимными голосованиями, таймерами и сохранением состояния в SQLite.
+Полноценный мафия-бот для Slack (Socket Mode) с анонимными голосованиями, таймерами и сохранением состояния в Postgres (Render) или SQLite (локально).
 
 ## Быстрый старт
 
@@ -11,11 +11,12 @@
    - Signing Secret
    - App Token (`xapp-...`)
 4. Создайте `.env` на основе `.env.example`.
-5. Для Telegram создайте бота через @BotFather и получите токен.
-6. Укажите `TELEGRAM_BOT_TOKEN` и, если нужен webhook, `TELEGRAM_WEBHOOK_DOMAIN`, `TELEGRAM_WEBHOOK_PATH`, `PORT`.
-7. Если Telegram работает через webhook, задайте `SLACK_PORT=0` или другой порт, чтобы `PORT` был свободен для Telegram.
-8. Если `TELEGRAM_WEBHOOK_DOMAIN` не задан, Telegram будет работать через polling (удобно локально).
-9. Установите зависимости и запустите:
+5. Для Render подключите Postgres и укажите `DATABASE_URL` (и `PGSSL=1`).
+6. Для Telegram создайте бота через @BotFather и получите токен.
+7. Укажите `TELEGRAM_BOT_TOKEN` и, если нужен webhook, `TELEGRAM_WEBHOOK_DOMAIN`, `TELEGRAM_WEBHOOK_PATH`, `PORT`.
+8. Если Telegram работает через webhook, задайте `SLACK_PORT=0` или другой порт, чтобы `PORT` был свободен для Telegram.
+9. Если `TELEGRAM_WEBHOOK_DOMAIN` не задан, Telegram будет работать через polling (удобно локально).
+10. Установите зависимости и запустите:
 
 ```bash
 cd /d E:\my_projects\Mafia Slack Bot
@@ -28,6 +29,8 @@ npm install
 npm start
 npm.cmd start
 ```
+
+Примечание: в режиме polling бот поднимает health‑server на `PORT`, чтобы Render видел открытый порт.
 
 ## Команды
 
@@ -87,7 +90,16 @@ Telegram в личке:
 - Выбывшие игроки не могут писать в канал игры (сообщения удаляются).
 - Последние слова: после смерти бот просит DM, сообщение публикуется в канал.
 - Есть пин‑сообщение Game Dashboard (фаза/таймер/живые).
-- Состояние хранится в SQLite (`data/mafia.db`).
+- Состояние хранится в Postgres (Render) или SQLite (`data/mafia.db`) при локальном запуске без `DATABASE_URL`.
+
+## Render + Postgres
+
+1. В Render создайте Postgres (Managed DB).
+2. В настройках сервиса добавьте:
+   - `DATABASE_URL` (строка подключения из Render)
+   - `PGSSL=1`
+3. Перезапустите сервис.  
+   Бот автоматически перейдёт на Postgres и будет сохранять данные между деплоями.
 
 ## Публичные каналы и «Найти игры»
 
