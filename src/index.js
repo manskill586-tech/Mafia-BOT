@@ -3,6 +3,7 @@ require("dotenv").config();
 
 const fs = require("fs");
 const path = require("path");
+const http = require("http");
 const Database = require("better-sqlite3");
 const { App, LogLevel } = require("@slack/bolt");
 const { Telegraf, Markup } = require("telegraf");
@@ -60,12 +61,27 @@ const LANGS = ["en", "ru"];
 const DEFAULT_LANG = "en";
 
 let telegramBot = null;
+let telegramMode = "disabled";
+let healthServer = null;
 const tgUserCache = new Map();
 const tgChatCache = new Map();
 const tgHandleCache = new Map();
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function startHealthServer() {
+  if (healthServer) return;
+  if (!Number.isFinite(PORT) || PORT <= 0) return;
+  healthServer = http.createServer((req, res) => {
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.end("OK");
+  });
+  healthServer.listen(PORT, () => {
+    console.log(`Health server listening on port ${PORT}.`);
+  });
 }
 
 function parsePlatformKey(key) {
@@ -11504,7 +11520,10 @@ async function handleTelegramGroupCommand(ctx, command, args) {
 }
 
 async function startTelegram() {
-  if (!TELEGRAM_BOT_TOKEN) return;
+  if (!TELEGRAM_BOT_TOKEN) {
+    telegramMode = "disabled";
+    return telegramMode;
+  }
   telegramBot = new Telegraf(TELEGRAM_BOT_TOKEN);
 
   telegramBot.use(async (ctx, next) => {
@@ -11672,8 +11691,9 @@ async function startTelegram() {
         await telegramBot.launch({
           webhook: { domain: TELEGRAM_WEBHOOK_DOMAIN, hookPath, port: PORT },
         });
+        telegramMode = "webhook";
         console.log("Telegram bot is running (webhook).");
-        return;
+        return telegramMode;
       } catch (err) {
         if (telegramBot.webhookServer) {
           try {
@@ -11700,8 +11720,9 @@ async function startTelegram() {
             );
           }
           await telegramBot.launch();
+          telegramMode = "polling";
           console.log("Telegram bot is running (polling).");
-          return;
+          return telegramMode;
         }
         const retryAfter =
           err?.response?.parameters?.retry_after ||
@@ -11725,12 +11746,15 @@ async function startTelegram() {
       "Telegram webhook failed after retries. Falling back to polling."
     );
     await telegramBot.launch();
+    telegramMode = "polling";
     console.log("Telegram bot is running (polling).");
-    return;
+    return telegramMode;
   }
 
   await telegramBot.launch();
+  telegramMode = "polling";
   console.log("Telegram bot is running (polling).");
+  return telegramMode;
 }
 
 function restoreActiveGames() {
@@ -11805,6 +11829,10 @@ function restoreActiveGames() {
     await startTelegram();
   } catch (err) {
     console.error("Telegram failed to start:", err?.message || err);
+    telegramMode = "disabled";
+  }
+  if (telegramMode !== "webhook") {
+    startHealthServer();
   }
   restoreActiveGames();
   await maybeNotifyMaintenanceDone(app.client);
