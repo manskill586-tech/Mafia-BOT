@@ -141,47 +141,47 @@ function setTelegramMessageId(value) {
 const I18N = {
   en: {
     role: {
-      mafia: "?? Mafia",
-      doctor: "????? Doctor",
-      detective: "??? Detective",
-      mayor: "?? Mayor",
-      bodyguard: "??? Bodyguard",
-      town: "?? Townsperson",
-      jester: "?? Jester",
-      godfather: "??? Godfather",
-      lucky: "?? Lucky",
-      bum: "?? Bum",
-      sergeant: "??? Sergeant",
-      lawyer: "?? Lawyer",
-      stalker: "?? Stalker",
+      mafia: ":mafia: Mafia",
+      doctor: ":doctor: Doctor",
+      detective: ":detective: Detective",
+      mayor: ":mayor: Mayor",
+      bodyguard: ":bodyguard: Bodyguard",
+      town: ":town: Townsperson",
+      jester: ":jester: Jester",
+      godfather: ":godfather: Godfather",
+      lucky: ":lucky: Lucky",
+      bum: ":bum: Bum",
+      sergeant: ":sergeant: Sergeant",
+      lawyer: ":lawyer: Lawyer",
+      stalker: ":stalker: Stalker",
     },
     role_help: {
       mafia:
-        "?? You are Mafia. Coordinate at night, choose a target, and reach parity with the town.",
+        ":mafia: You are Mafia. Coordinate at night, choose a target, and reach parity with the town.",
       godfather:
-        "??? You are the Godfather. You are mafia, but the Detective sees you as Town.",
+        ":godfather: You are the Godfather. You are mafia, but the Detective sees you as Town.",
       doctor:
-        "????? You are the Doctor. Each night choose someone to save from death (including yourself within the limit).",
+        ":doctor: You are the Doctor. Each night choose someone to save from death (including yourself within the limit).",
       detective:
-        "??? You are the Detective. Each night you can either check a player or kill a target (only one action).",
+        ":detective: You are the Detective. Each night you can either check a player or kill a target (only one action).",
       mayor:
-        "?? You are the Mayor. Your vote counts as 2 during the day.",
+        ":mayor: You are the Mayor. Your vote counts as 2 during the day.",
       bodyguard:
-        "??? You are the Bodyguard. Choose a player to protect; if mafia attacks them, you take the hit.",
+        ":bodyguard: You are the Bodyguard. Choose a player to protect; if mafia attacks them, you take the hit.",
       jester:
-        "?? You are the Jester. If you are executed by vote, you win instantly.",
+        ":jester: You are the Jester. If you are executed by vote, you win instantly.",
       town:
-        "?? You are a Townsperson. Find mafia and vote them out.",
+        ":town: You are a Townsperson. Find mafia and vote them out.",
       lucky:
-        "?? You are Lucky. Each night you have a 50% chance to survive any killing attempt.",
+        ":lucky: You are Lucky. Each night you have a 50% chance to survive any killing attempt.",
       bum:
-        "?? You are the Bum. Visit someone at night; if they die, you witness who killed them.",
+        ":bum: You are the Bum. Visit someone at night; if they die, you witness who killed them.",
       sergeant:
-        "??? You are the Sergeant. The Detective shares results with you. If the Detective dies, you get their actions.",
+        ":sergeant: You are the Sergeant. The Detective shares results with you. If the Detective dies, you get their actions.",
       lawyer:
-        "?? You are the Lawyer. At night protect a player; if you protect mafia, the Detective sees them as Town. Your goal is mafia victory.",
+        ":lawyer: You are the Lawyer. At night protect a player; if you protect mafia, the Detective sees them as Town. Your goal is mafia victory.",
       stalker:
-        "?? You are the Stalker. You have a contract on a role. Kill that role yourself to score a win.",
+        ":stalker: You are the Stalker. You have a contract on a role. Kill that role yourself to score a win.",
     },
     time: {
       sec: "{seconds} sec",
@@ -189,83 +189,83 @@ const I18N = {
       min_sec: "{minutes} min {seconds} sec",
     },
     button: {
-      join: "? Join",
-      leave: "? Leave",
-      start: "?? Start",
-      extend: "? Extend +2m",
-      end: "?? End",
-      ready: "? Ready",
-      abstain: "?? Abstain",
-      no_kill: "?? No kill",
-      role_help: "?? What to do?",
-      detective_check: "?? Check",
-      detective_kill: "?? Kill",
-      prev: "?? Prev",
-      next: "?? Next",
-      page: "?? Page {page}/{total}",
-      help_add: "? Add bot",
-      help_commands: "?? Commands",
-      help_settings: "?? Settings",
-      find_games: "?? Find games",
-      my_channels: "??? My channels",
-      faq: "? FAQ",
-      back: "?? Back",
-      public: "?? Public",
-      private: "?? Private",
-      filter_active: "?? Active",
-      filter_recruiting: "?? Recruiting",
-      filter_inactive: "? Inactive",
-      filter_lang_all: "?? All",
-      filter_lang_en: "???? ENG",
-      filter_lang_ru: "???? RU",
-      lang_en: "???? English",
-      lang_ru: "???? Russian",
+      join: ":join: Join",
+      leave: ":leave: Leave",
+      start: ":start: Start",
+      extend: ":extend: Extend +2m",
+      end: ":end: End",
+      ready: ":ready: Ready",
+      abstain: ":abstain: Abstain",
+      no_kill: ":no_kill: No kill",
+      role_help: ":help: What to do?",
+      detective_check: ":check: Check",
+      detective_kill: ":kill: Kill",
+      prev: ":prev: Prev",
+      next: ":next: Next",
+      page: ":info: Page {page}/{total}",
+      help_add: ":help: Add bot",
+      help_commands: ":help: Commands",
+      help_settings: ":help: Settings",
+      find_games: ":find: Find games",
+      my_channels: ":help: My channels",
+      faq: ":help: FAQ",
+      back: ":back: Back",
+      public: ":public: Public",
+      private: ":private: Private",
+      filter_active: ":active: Active",
+      filter_recruiting: ":recruiting: Recruiting",
+      filter_inactive: ":inactive: Inactive",
+      filter_lang_all: ":info: All",
+      filter_lang_en: ":info: ENG",
+      filter_lang_ru: ":info: RU",
+      lang_en: ":info: English",
+      lang_ru: ":info: Russian",
     },
     dashboard: {
-      title: "?? Game Dashboard",
-      phase: "?? Phase: {phase}",
-      timer: "? Timer: {time}",
-      alive: "?? Alive ({count}): {list}",
-      ready: "? Ready: {ready}/{total}",
+      title: ":dashboard: Game Dashboard",
+      phase: ":phase: Phase: {phase}",
+      timer: ":timer: Timer: {time}",
+      alive: ":alive: Alive ({count}): {list}",
+      ready: ":ready: Ready: {ready}/{total}",
     },
     home: {
-      title: "?? MafiaBot",
-      tagline: "?? Your Mafia game control center for Slack. (Developer: @bob)",
+      title: ":mafia: MafiaBot",
+      tagline: ":info: Your Mafia game control center for Slack. (Developer: @bob)",
       quickstart:
-        "*?? Quick Start*\n" +
-        "1?? Add me to a channel: `/invite @MafiaBot`\n" +
-        "2?? Create a lobby: `@MafiaBot create`\n" +
-        "3?? Players press `Join`, host presses `Start` or everyone `Ready`",
+        "*:info: Quick Start*\n" +
+        "1 :info: Add me to a channel: `/invite @MafiaBot`\n" +
+        "2 :info: Create a lobby: `@MafiaBot create`\n" +
+        "3 :info: Players press `Join`, host presses `Start` or everyone `Ready`",
       controls:
-        "*?? Lobby Controls*\n" +
+        "*:info: Lobby Controls*\n" +
         "- Buttons: `Join`, `Leave`, `Ready`, `Start`, `Extend`, `End`\n" +
         "- Commands: `@MafiaBot join`, `leave`, `start`, `extend 2`, `status`, `config`",
       gameplay:
-        "*?? During the Game*\n" +
+        "*:info: During the Game*\n" +
         "- Night actions and day voting arrive in DM\n" +
         "- `whisper <text>` in DM once per day\n" +
         "- If eliminated, you get one “last words” DM",
       features:
-        "*? Highlights*\n" +
+        "*:info: Highlights*\n" +
         "- Roles: Mafia, Doctor, Detective, Mayor, Bodyguard, Jester, Godfather, Lucky, Bum, Sergeant, Lawyer, Stalker\n" +
-        "- Anonymous voting, auto?timers, saved state (SQLite)\n" +
+        "- Anonymous voting, auto-timers, saved state (SQLite)\n" +
         "- Mafia room + graveyard (if permissions allow)",
       tips:
-        "*?? Tips*\n" +
+        "*:info: Tips*\n" +
         "- If you have multiple games, include `#channel` in DM commands\n" +
         "- Change language in DM: `lang en` / `lang ru`\n" +
         "- Edit channel defaults in DM: `My channels`\n" +
         "- Open FAQ in DM: `FAQ`",
-      stats_title: "?? Your stats",
+      stats_title: ":info: Your stats",
       stats_line:
         "Games: {games} • Wins: {wins} • Losses: {losses} • Winrate: {rate}%",
-      channel_stats_title: "?? This channel",
+      channel_stats_title: ":info: This channel",
       channel_stats_line:
         "Games: {games} • Wins: {wins} • Losses: {losses} • Winrate: {rate}%",
-      role_stats_title: "?? Role stats",
-      role_stats_empty: "?? No role stats yet.",
-      current_title: "??? Current game",
-      current_none: "?? No active game.",
+      role_stats_title: ":info: Role stats",
+      role_stats_empty: ":info: No role stats yet.",
+      current_title: ":info: Current game",
+      current_none: ":info: No active game.",
       current_line:
         "Channel: {channel}\n" +
         "Phase: {phase}\n" +
@@ -273,446 +273,446 @@ const I18N = {
         "Alive: {alive}\n" +
         "You: {status}\n" +
         "Role: {role}",
-      status_alive: "? Alive",
-      status_dead: "? Eliminated",
-      role_unknown: "?? Unknown",
-      history_title: "?? Last 3 nights",
-      history_empty: "?? No night results yet.",
-      history_line: "?? Night {round}: {text}",
+      status_alive: ":alive: Alive",
+      status_dead: ":info: Eliminated",
+      role_unknown: ":info: Unknown",
+      history_title: ":info: Last 3 nights",
+      history_empty: ":info: No night results yet.",
+      history_line: ":phase: Night {round}: {text}",
     },
     find: {
-      prompt_public: "?? Make {channel} public in Find Games?",
-      set_public: "? {channel} is now public in Find Games.",
-      set_private: "?? {channel} is private and won't be listed.",
-      private_not_allowed: "? Private channels can't be listed in Find Games.",
-      title: "?? Find games",
-      empty: "?? No channels match this filter.",
-      status_active: "?? Active — {phase} {round} • Alive {alive}",
-      status_recruiting: "?? Recruiting — {count}/{min}, starts in {time}",
-      status_inactive: "? Inactive — no active game",
-      filters: "??? Filter:",
-      filter_lang: "?? Language:",
-      lang_label_en: "???? ENG",
-      lang_label_ru: "???? RU",
+      prompt_public: ":public: Make {channel} public in Find Games?",
+      set_public: ":public: {channel} is now public in Find Games.",
+      set_private: ":private: {channel} is private and won't be listed.",
+      private_not_allowed: ":private: Private channels can't be listed in Find Games.",
+      title: ":find: Find games",
+      empty: ":info: No channels match this filter.",
+      status_active: ":active: Active — {phase} {round} • Alive {alive}",
+      status_recruiting: ":recruiting: Recruiting — {count}/{min}, starts in {time}",
+      status_inactive: ":inactive: Inactive — no active game",
+      filters: ":info: Filter:",
+      filter_lang: ":info: Language:",
+      lang_label_en: ":info: ENG",
+      lang_label_ru: ":info: RU",
     },
     faq: {
-      title: "? FAQ",
+      title: ":help: FAQ",
       intro:
-        "?? Choose a question below. You can also type `faq <id>` in DM to open a specific answer.",
-      id_label: "?? FAQ ID: `faq {id}`",
-      not_found: "?? Question not found. Showing FAQ list.",
-      command_open: "? Open the FAQ:",
-      command_detail: "? Open FAQ question `{id}`:",
-      open_button: "? Open FAQ",
+        ":info: Choose a question below. You can also type `faq <id>` in DM to open a specific answer.",
+      id_label: ":help: FAQ ID: `faq {id}`",
+      not_found: ":info: Question not found. Showing FAQ list.",
+      command_open: ":info: Open the FAQ:",
+      command_detail: ":info: Open FAQ question `{id}`:",
+      open_button: ":info: Open FAQ",
     },
     my_channels: {
-      title: "??? My channels",
-      empty: "?? No channels yet.",
-      status_public: "?? Public",
-      status_private: "?? Private",
-      not_owner: "? You are not the owner for this channel.",
-      saved: "? Channel settings saved.",
-      edit_intro: "?? Editing {channel}",
+      title: ":help: My channels",
+      empty: ":info: No channels yet.",
+      status_public: ":public: Public",
+      status_private: ":private: Private",
+      not_owner: ":info: You are not the owner for this channel.",
+      saved: ":info: Channel settings saved.",
+      edit_intro: ":info: Editing {channel}",
     },
     settings: {
-      title: "?? Channel settings",
-      privacy_label: "?? Find Games visibility",
-      privacy_public: "?? Public",
-      privacy_private: "?? Private",
-      channel_lang: "?? Channel language",
+      title: ":info: Channel settings",
+      privacy_label: ":info: Find Games visibility",
+      privacy_public: ":public: Public",
+      privacy_private: ":private: Private",
+      channel_lang: ":info: Channel language",
       channel_lang_en: "English (ENG)",
       channel_lang_ru: "Russian (RU)",
-      day_minutes: "?? Day minutes",
-      night_minutes: "?? Night minutes",
-      lobby_minutes: "?? Lobby minutes",
-      min_players: "?? Minimum players",
-      extend_policy: "?? Who can extend lobby?",
-      extend_host: "?? Host only",
-      extend_any: "?? Anyone",
-      warning_1: "?? Warning #1 (sec)",
-      warning_2: "?? Warning #2 (sec)",
-      auto_shorten: "?? Auto?shorten phase",
-      whisper_enabled: "?? Whisper enabled",
-      allow_abstain: "?? Allow abstain",
-      allow_no_kill: "?? Allow no?kill",
-      doctor_self_save: "????? Self?save limit",
-      toggle_on: "? On",
-      toggle_off: "? Off",
-      submit: "? Save",
-      cancel: "? Cancel",
-      invalid_number: "?? Enter a valid number.",
-      invalid_min_players: "?? Min players must be at least 4.",
-      invalid_warning: "?? Warnings must be > 0.",
-      invalid_self_save: "?? Self?save limit must be >= 0.",
+      day_minutes: ":info: Day minutes",
+      night_minutes: ":info: Night minutes",
+      lobby_minutes: ":info: Lobby minutes",
+      min_players: ":info: Minimum players",
+      extend_policy: ":info: Who can extend lobby?",
+      extend_host: ":info: Host only",
+      extend_any: ":info: Anyone",
+      warning_1: ":info: Warning #1 (sec)",
+      warning_2: ":info: Warning #2 (sec)",
+      auto_shorten: ":info: Auto-shorten phase",
+      whisper_enabled: ":info: Whisper enabled",
+      allow_abstain: ":info: Allow abstain",
+      allow_no_kill: ":info: Allow no-kill",
+      doctor_self_save: ":info: Self-save limit",
+      toggle_on: ":info: On",
+      toggle_off: ":info: Off",
+      submit: ":info: Save",
+      cancel: ":info: Cancel",
+      invalid_number: ":info: Enter a valid number.",
+      invalid_min_players: ":info: Min players must be at least 4.",
+      invalid_warning: ":info: Warnings must be > 0.",
+      invalid_self_save: ":info: Self-save limit must be >= 0.",
     },
     dm: {
       lang_prompt:
-        "?? Choose language below (English / Русский). You can change later with `lang en` / `lang ru`.",
-      lang_set_en: "? Language set to English.",
-      lang_set_ru: "? Language set to Russian.",
-      lang_usage: "?? Usage: `lang en` or `lang ru`.",
+        ":info: Choose language below (English / Русский). You can change later with `lang en` / `lang ru`.",
+      lang_set_en: ":info: Language set to English.",
+      lang_set_ru: ":info: Language set to Russian.",
+      lang_usage: ":info: Usage: `lang en` or `lang ru`.",
       lang_change_command:
-        "?? Language is already set. Change it with `lang en` / `lang ru`.",
+        ":info: Language is already set. Change it with `lang en` / `lang ru`.",
       help_intro_tg:
-        "?? Hi! I'm MafiaBot for Telegram.\n" +
-        "?? Quick start:\n" +
+        ":info: Hi! I'm MafiaBot for Telegram.\n" +
+        ":info: Quick start:\n" +
         "1) Add me to a group\n" +
         "2) In group: `/create` to open a lobby\n" +
         "3) Players `/join`, host `/start`\n" +
-        "?? Night/day actions arrive here as buttons",
+        ":info: Night/day actions arrive here as buttons",
       help_add_tg:
-        "? Add me to a Telegram group. Optional: give admin rights so I can delete messages from eliminated players.",
+        ":info: Add me to a Telegram group. Optional: give admin rights so I can delete messages from eliminated players.",
       help_commands_tg:
-        "?? Group commands: `/create`, `/join`, `/leave`, `/start`, `/extend 2`, `/status`, `/config`, `/end`",
+        ":info: Group commands: `/create`, `/join`, `/leave`, `/start`, `/extend 2`, `/status`, `/config`, `/end`",
       help_settings_tg:
-        "?? Settings: use `/config` in the group, and `/mychannels` here to edit default channel settings.",
+        ":help: Settings: use `/config` in the group, and `/mychannels` here to edit default channel settings.",
       help_intro:
-        "?? Hi! I'm MafiaBot.\n" +
-        "?? How to start:\n" +
+        ":info: Hi! I'm MafiaBot.\n" +
+        ":info: How to start:\n" +
         "1) Add me to a channel: `/invite @MafiaBot`\n" +
         "2) Create a lobby: `@MafiaBot create` (or button)\n" +
         "3) Players join with `Join`, host starts with `Start`\n" +
-        "?? If you have multiple games, include the channel in DM: `vote @user #channel`\n" +
-        "?? DM: `whisper <text>` (once per day)\n" +
-        "?? Change language: `lang en` / `lang ru`.\n" +
-        "?? Use `Find games` to browse public lobbies.\n" +
-        "??? Use `My channels` to edit your channel settings.\n" +
-        "? Use `FAQ` for common questions.",
+        ":info: If you have multiple games, include the channel in DM: `vote @user #channel`\n" +
+        ":info: DM: `whisper <text>` (once per day)\n" +
+        ":info: Change language: `lang en` / `lang ru`.\n" +
+        ":info: Use `Find games` to browse public lobbies.\n" +
+        ":info: Use `My channels` to edit your channel settings.\n" +
+        ":info: Use `FAQ` for common questions.",
       help_add:
-        "? To add me to a channel:\n" +
+        ":info: To add me to a channel:\n" +
         "1) Open the channel\n" +
         "2) Type `/invite @MafiaBot`\n" +
         "Then create a lobby with `@MafiaBot create` or the button.",
       help_commands:
-        "?? Channel commands:\n" +
+        ":info: Channel commands:\n" +
         "- `@MafiaBot create` — create lobby\n" +
         "- `@MafiaBot join` / `leave`\n" +
         "- `@MafiaBot start` — start (host)\n" +
         "- `@MafiaBot extend 2` — extend lobby\n" +
         "- `@MafiaBot status`, `config`, `end`\n" +
-        "?? DM: `whisper <text>` (once per day)\n" +
-        "?? Change language: `lang en` / `lang ru`.\n" +
-        "?? Find games: use the `Find games` button in DM.\n" +
-        "??? My channels: `mychannels` in DM.\n" +
-        "??? My channels: use the `My channels` button in DM.\n" +
-        "? FAQ: use the `FAQ` button in DM.",
+        ":info: DM: `whisper <text>` (once per day)\n" +
+        ":info: Change language: `lang en` / `lang ru`.\n" +
+        ":find: Find games: use the `Find games` button in DM.\n" +
+        ":help: My channels: `mychannels` in DM.\n" +
+        ":help: My channels: use the `My channels` button in DM.\n" +
+        ":help: FAQ: use the `FAQ` button in DM.",
       help_settings:
-        "?? Settings (lobby only):\n" +
+        ":help: Settings (lobby only):\n" +
         "- `@MafiaBot config day 5`\n" +
         "- `@MafiaBot config night 2`\n" +
         "- `@MafiaBot config lobby 5`\n" +
         "- `@MafiaBot config min 4`\n" +
         "- `@MafiaBot config extend host|any`\n" +
-        "?? Change language: `lang en` / `lang ru`.\n" +
-        "?? Find games: use the `Find games` button in DM.\n" +
-        "??? My channels: use the `My channels` button in DM.\n" +
-        "? FAQ: use the `FAQ` button in DM.",
+        ":info: Change language: `lang en` / `lang ru`.\n" +
+        ":find: Find games: use the `Find games` button in DM.\n" +
+        ":help: My channels: use the `My channels` button in DM.\n" +
+        ":help: FAQ: use the `FAQ` button in DM.",
     },
     dev: {
       panel: {
-        title: "??? Dev panel",
-        status_on: "?? Maintenance: ON",
-        status_off: "?? Maintenance: OFF",
-        button_enable: "??? Enable maintenance",
-        button_disable: "??? Disable maintenance",
+        title: ":info: Dev panel",
+        status_on: ":maint: Maintenance: ON",
+        status_off: ":maint: Maintenance: OFF",
+        button_enable: ":info: Enable maintenance",
+        button_disable: ":info: Disable maintenance",
       },
-      not_authorized: "? You are not authorized to use developer commands.",
-      code_invalid: "? Invalid developer code.",
-      help: "??? Dev: `dev <code>` • `test setup #channel Alice,Bob` • `as Alice vote Bob`",
+      not_authorized: ":info: You are not authorized to use developer commands.",
+      code_invalid: ":info: Invalid developer code.",
+      help: ":info: Dev: `dev <code>` • `test setup #channel Alice,Bob` • `as Alice vote Bob`",
     },
     maintenance: {
-      reply: "? MafiaBot is updating and will be back soon.",
-      blocked: "?? MafiaBot is updating. New lobbies are temporarily disabled.",
-      lobby_closed: "?? Lobby closed due to maintenance.",
-      done: "? All active games finished. You can update the bot now.",
+      reply: ":mafia: MafiaBot is updating and will be back soon.",
+      blocked: ":mafia: MafiaBot is updating. New lobbies are temporarily disabled.",
+      lobby_closed: ":maint: Lobby closed due to maintenance.",
+      done: ":info: All active games finished. You can update the bot now.",
     },
     last_words: {
       prompt:
-        "??? You are eliminated. Send one last message within 2 minutes. It will be posted in {channel}.",
-      received: "? Your last words were posted.",
-      expired: "? Time is up. Last words were not sent.",
-      post: "??? Last words from {name}: {text}",
+        ":last_words: You are eliminated. Send one last message within 2 minutes. It will be posted in {channel}.",
+      received: ":last_words: Your last words were posted.",
+      expired: ":last_words: Time is up. Last words were not sent.",
+      post: ":last_words: Last words from {name}: {text}",
     },
     dead: {
-      no_talk: "?? You are eliminated and cannot speak in this channel.",
-      message_deleted: "?? You are eliminated and cannot speak in this channel.",
+      no_talk: ":info: You are eliminated and cannot speak in this channel.",
+      message_deleted: ":info: You are eliminated and cannot speak in this channel.",
     },
     graveyard: {
       unavailable:
-        "?? Graveyard channel is unavailable (missing permission to create/invite).",
+        ":graveyard: Graveyard channel is unavailable (missing permission to create/invite).",
     },
     mafia_room: {
-      intro: "??? Mafia room created. Discuss here during the night.",
+      intro: ":mafia: Mafia room created. Discuss here during the night.",
     },
     whisper: {
-      usage: "?? Usage: `whisper <text>`",
-      not_day: "?? Whisper is only available during the day.",
-      disabled: "?? Whisper is disabled for this channel.",
-      already_used: "?? You already used a whisper this day.",
-      sent: "? Your whisper was sent anonymously.",
-      post: "?? Anonymous whisper: {text}",
+      usage: ":info: Usage: `whisper <text>`",
+      not_day: ":info: Whisper is only available during the day.",
+      disabled: ":info: Whisper is disabled for this channel.",
+      already_used: ":info: You already used a whisper this day.",
+      sent: ":info: Your whisper was sent anonymously.",
+      post: ":info: Anonymous whisper: {text}",
     },
     lobby: {
-      title: "?? Mafia lobby",
-      host: "?? Host: {host}",
-      players: "?? Players: {count}/{min}",
-      ready: "? Ready: {ready}/{total}",
-      start_in: "? Starts in: {time}",
+      title: ":mafia: Mafia lobby",
+      host: ":info: Host: {host}",
+      players: ":info: Players: {count}/{min}",
+      ready: ":ready: Ready: {ready}/{total}",
+      start_in: ":start: Starts in: {time}",
       created:
-        "?? Lobby created. Host: {host}. Join with `@MafiaBot join` or the button.",
-      joined: "? {user} joined. Players: {count}",
-      left: "? {user} left. Players: {count}",
-      empty_closed: "?? Lobby is empty. Game removed.",
+        ":info: Lobby created. Host: {host}. Join with `@MafiaBot join` or the button.",
+      joined: ":info: {user} joined. Players: {count}",
+      left: ":info: {user} left. Players: {count}",
+      empty_closed: ":info: Lobby is empty. Game removed.",
       closed_not_enough:
-        "?? Lobby closed: need at least {min} players, now {count}.",
-      timeout_start: "? Lobby time ended. Starting game!",
-      host_start: "?? Host started the game.",
-      ready_start: "? All players are ready. Starting game!",
-      extended: "? Lobby extended by {minutes} min.",
-      closed: "? Lobby closed.",
-      starting: "?? Lobby closed. Game starting.",
-      end: "?? Game ended.",
-      panel_summary: "?? Lobby players {count}/{min}.",
+        ":info: Lobby closed: need at least {min} players, now {count}.",
+      timeout_start: ":info: Lobby time ended. Starting game!",
+      host_start: ":info: Host started the game.",
+      ready_start: ":info: All players are ready. Starting game!",
+      extended: ":info: Lobby extended by {minutes} min.",
+      closed: ":info: Lobby closed.",
+      starting: ":info: Lobby closed. Game starting.",
+      end: ":info: Game ended.",
+      panel_summary: ":info: Lobby players {count}/{min}.",
     },
     warn: {
-      day: "?? Day ends in {seconds} sec.",
-      night: "?? Night ends in {seconds} sec.",
-      lobby: "?? Lobby auto-start in {seconds} sec.",
-      shortened_day: "? Day shortened due to high activity.",
-      shortened_night: "? Night shortened due to high activity.",
+      day: ":warn: Day ends in {seconds} sec.",
+      night: ":warn: Night ends in {seconds} sec.",
+      lobby: ":warn: Lobby auto-start in {seconds} sec.",
+      shortened_day: ":warn: Day shortened due to high activity.",
+      shortened_night: ":warn: Night shortened due to high activity.",
     },
     reminder: {
-      night_action: "night action ??",
-      vote: "vote ???",
-      text: "?? Reminder: finish {action} for the game in {channel}.",
+      night_action: "night action :warn:",
+      vote: "vote :vote:",
+      text: ":info: Reminder: finish {action} for the game in {channel}.",
     },
     phase: {
-      night_start: "?? Night {round}. The city falls asleep...",
-      day_start: "?? Day {round}. The city wakes up...",
+      night_start: ":phase: Night {round}. The city falls asleep...",
+      day_start: ":phase: Day {round}. The city wakes up...",
     },
     night: {
-      ended_killed: "?? Night is over. Killed: {targets}.",
-      ended_none: "?? Night is over. Nobody died.",
-      bodyguard: "??? Bodyguard took the hit.",
+      ended_killed: ":phase: Night is over. Killed: {targets}.",
+      ended_none: ":phase: Night is over. Nobody died.",
+      bodyguard: ":bodyguard: Bodyguard took the hit.",
     },
     day: {
-      ended_executed: "??? Voting ended. Executed: {target} ({role}).",
-      ended_tie: "??? Voting ended. Tie — nobody executed.",
+      ended_executed: ":phase: Voting ended. Executed: {target} ({role}).",
+      ended_tie: ":phase: Voting ended. Tie — nobody executed.",
     },
     auto: {
-      applied: "?? Auto actions applied.",
+      applied: ":info: Auto actions applied.",
     },
     winner: {
-      mafia: "?? Mafia wins!",
-      town: "?? Town wins!",
-      jester: "?? Jester wins!",
+      mafia: ":mafia: Mafia wins!",
+      town: ":town: Town wins!",
+      jester: ":jester: Jester wins!",
       summary: "{winner}\nMafia: {mafia}\nTown: {town}",
       summary_jester: "{winner}\nJester: {jester}\nMafia: {mafia}\nTown: {town}",
     },
     prompt: {
-      mafia: "?? Game in {channel}. Choose mafia target.",
-      doctor: "????? Game in {channel}. Who to save tonight?",
-      detective_mode: "??? Choose your action for tonight:",
-      detective: "??? Game in {channel}. Who to check?",
-      detective_kill: "?? Game in {channel}. Who to kill?",
-      bodyguard: "??? Game in {channel}. Who to protect?",
-      bum: "?? Game in {channel}. Who to visit tonight?",
-      lawyer: "?? Game in {channel}. Who to protect?",
-      stalker: "?? Contract: {role}. Choose your target.",
-      day: "??? Game in {channel}. Your vote to eliminate.",
+      mafia: ":mafia: Game in {channel}. Choose mafia target.",
+      doctor: ":doctor: Game in {channel}. Who to save tonight?",
+      detective_mode: ":detective: Choose your action for tonight:",
+      detective: ":detective: Game in {channel}. Who to check?",
+      detective_kill: ":kill: Game in {channel}. Who to kill?",
+      bodyguard: ":lawyer: Game in {channel}. Who to protect?",
+      bum: ":bum: Game in {channel}. Who to visit tonight?",
+      lawyer: ":lawyer: Game in {channel}. Who to protect?",
+      stalker: ":stalker: Contract: {role}. Choose your target.",
+      day: ":vote: Game in {channel}. Your vote to eliminate.",
     },
     select: {
-      player: "?? Select a player",
-      target: "?? Select a target",
+      player: ":info: Select a player",
+      target: ":info: Select a target",
     },
     help: {
       commands:
-        "?? Commands: create, join, leave, start, status, end, config, extend. Voting and night actions are in DM.",
+        ":help: Commands: create, join, leave, start, status, end, config, extend. Voting and night actions are in DM.",
     },
     config: {
       summary:
-        "?? Settings: day={day}m, night={night}m, lobby={lobby}m, min={min}, extend={extend}",
+        ":help: Settings: day={day}m, night={night}m, lobby={lobby}m, min={min}, extend={extend}",
     },
     status: {
-      text: "?? Status: {state}. Host: {host}. Alive: {alive}",
+      text: ":info: Status: {state}. Host: {host}. Alive: {alive}",
     },
     state: {
-      lobby: "?? lobby",
-      day: "?? day",
-      night: "?? night",
-      ended: "?? ended",
+      lobby: ":info: lobby",
+      day: ":info: day",
+      night: ":info: night",
+      ended: ":info: ended",
     },
     err: {
-      channel_unknown: "? Could not determine channel.",
-      already_in_other: "? You are already in a lobby or game in {channel}.",
-      lobby_not_active: "?? Lobby is not active.",
-      lobby_exists: "?? A lobby already exists in this channel.",
-      lobby_none: "? No lobby right now. Create: @MafiaBot create",
-      already_in: "?? You are already in the game.",
-      lobby_only: "? You can leave only in the lobby.",
-      not_in_lobby: "? You are not in the lobby.",
-      lobby_start_none: "?? No active lobby to start.",
-      only_host_start: "? Only the host can start the game.",
-      need_min_players: "?? Need at least {min} players.",
-      game_not_created: "? Game not created.",
-      config_lobby_only: "?? Configuration is only available in the lobby.",
-      config_host_only: "? Only the host can configure the game.",
-      config_usage_extend: "?? Usage: @MafiaBot config extend host|any",
+      channel_unknown: ":info: Could not determine channel.",
+      already_in_other: ":info: You are already in a lobby or game in {channel}.",
+      lobby_not_active: ":info: Lobby is not active.",
+      lobby_exists: ":info: A lobby already exists in this channel.",
+      lobby_none: ":info: No lobby right now. Create: @MafiaBot create",
+      already_in: ":info: You are already in the game.",
+      lobby_only: ":info: You can leave only in the lobby.",
+      not_in_lobby: ":info: You are not in the lobby.",
+      lobby_start_none: ":info: No active lobby to start.",
+      only_host_start: ":info: Only the host can start the game.",
+      need_min_players: ":info: Need at least {min} players.",
+      game_not_created: ":info: Game not created.",
+      config_lobby_only: ":info: Configuration is only available in the lobby.",
+      config_host_only: ":info: Only the host can configure the game.",
+      config_usage_extend: ":info: Usage: @MafiaBot config extend host|any",
       config_usage_numbers:
-        "?? Usage: @MafiaBot config day 5 | night 2 | lobby 5 | min 4",
-      config_options: "?? Available settings: day, night, lobby, min, extend",
-      extend_lobby_only: "?? You can extend only in the lobby.",
-      extend_not_allowed: "? Only the host or an allowed participant can extend.",
-      no_active_game: "?? No active game.",
-      only_host_end: "? Only the host can end the game.",
-      unknown_command: "? Unknown command. Type @MafiaBot help",
+        ":info: Usage: @MafiaBot config day 5 | night 2 | lobby 5 | min 4",
+      config_options: ":info: Available settings: day, night, lobby, min, extend",
+      extend_lobby_only: ":info: You can extend only in the lobby.",
+      extend_not_allowed: ":info: Only the host or an allowed participant can extend.",
+      no_active_game: ":info: No active game.",
+      only_host_end: ":info: Only the host can end the game.",
+      unknown_command: ":info: Unknown command. Type @MafiaBot help",
     },
     ok: {
-      settings_updated: "? Settings updated.",
+      settings_updated: ":help: Settings updated.",
     },
     action: {
-      role_dm: "?? Your role in the game {channel}: *{role}*.",
-      failed: "? Failed to process selection.",
-      game_ended: "?? Game already ended.",
-      not_in_game: "? You are not in the game or you are eliminated.",
-      not_day: "?? It is not day now.",
-      choose_alive: "?? Choose a living player.",
-      already_acted: "?? You already acted this phase.",
-      already_voted: "?? Your vote is already locked.",
-      vote_recorded: "? Your vote recorded: {target}.",
-      vote_abstain: "? You abstained.",
-      not_night: "?? It is not night now.",
-      mafia_only: "? Only mafia can do that.",
-      no_mafia_target: "?? You cannot choose mafia.",
-      choice_recorded: "? Your choice: {target}.",
-      no_kill: "? Your choice: no kill.",
-      doctor_only: "? Only the doctor can do that.",
-      detective_only: "? Only the detective can do that.",
-      bodyguard_only: "? Only the bodyguard can do that.",
-      bum_only: "? Only the Bum can do that.",
-      lawyer_only: "? Only the Lawyer can do that.",
-      stalker_only: "? Only the Stalker can do that.",
-      doctor_self_save_limit: "?? You can only save yourself once per game.",
-      doctor_save: "? You save: {target}.",
-      detective_check: "? You check: {target}.",
-      detective_kill: "? You kill: {target}.",
-      detective_result: "?? Check result: {target} is {result}.",
-      bodyguard_protect: "? You protect: {target}.",
-      bum_visit: "? You visit: {target}.",
-      lawyer_protect: "? You protect: {target}.",
-      stalker_kill: "? You hunt: {target}.",
-      result_mafia: "?? mafia",
-      result_not_mafia: "?? not mafia",
+      role_dm: ":info: Your role in the game {channel}: *{role}*.",
+      failed: ":info: Failed to process selection.",
+      game_ended: ":info: Game already ended.",
+      not_in_game: ":info: You are not in the game or you are eliminated.",
+      not_day: ":info: It is not day now.",
+      choose_alive: ":info: Choose a living player.",
+      already_acted: ":info: You already acted this phase.",
+      already_voted: ":info: Your vote is already locked.",
+      vote_recorded: ":info: Your vote recorded: {target}.",
+      vote_abstain: ":info: You abstained.",
+      not_night: ":info: It is not night now.",
+      mafia_only: ":info: Only mafia can do that.",
+      no_mafia_target: ":info: You cannot choose mafia.",
+      choice_recorded: ":info: Your choice: {target}.",
+      no_kill: ":info: Your choice: no kill.",
+      doctor_only: ":info: Only the doctor can do that.",
+      detective_only: ":info: Only the detective can do that.",
+      bodyguard_only: ":info: Only the bodyguard can do that.",
+      bum_only: ":info: Only the Bum can do that.",
+      lawyer_only: ":info: Only the Lawyer can do that.",
+      stalker_only: ":info: Only the Stalker can do that.",
+      doctor_self_save_limit: ":info: You can only save yourself once per game.",
+      doctor_save: ":info: You save: {target}.",
+      detective_check: ":info: You check: {target}.",
+      detective_kill: ":info: You kill: {target}.",
+      detective_result: ":check: Check result: {target} is {result}.",
+      bodyguard_protect: ":info: You protect: {target}.",
+      bum_visit: ":info: You visit: {target}.",
+      lawyer_protect: ":info: You protect: {target}.",
+      stalker_kill: ":info: You hunt: {target}.",
+      result_mafia: ":info: mafia",
+      result_not_mafia: ":info: not mafia",
     },
     bum: {
-      witness: "?? You witnessed a murder: {killer} killed {victim}.",
-      nothing: "?? You saw nothing tonight.",
+      witness: ":info: You witnessed a murder: {killer} killed {victim}.",
+      nothing: ":info: You saw nothing tonight.",
     },
     stalker: {
-      target_assigned: "?? Your contract role: {role}.",
-      success: "?? Contract completed! Wins: {wins}. New target: {role}.",
-      failed: "?? Contract failed. New target: {role}.",
-      no_targets: "?? No available roles to target right now.",
+      target_assigned: ":info: Your contract role: {role}.",
+      success: ":info: Contract completed! Wins: {wins}. New target: {role}.",
+      failed: ":info: Contract failed. New target: {role}.",
+      no_targets: ":info: No available roles to target right now.",
     },
     sergeant: {
-      promoted: "??? The Detective is dead. You take over their actions.",
-      info: "??? Detective result: {target} is {result}.",
+      promoted: ":info: The Detective is dead. You take over their actions.",
+      info: ":detective: Detective result: {target} is {result}.",
     },
     dm_cmd: {
-      no_game: "?? No active game for this command.",
-      need_alive: "?? You must mention a living player.",
-      day_only: "?? Day actions are only available during the day.",
-      night_only: "?? Night actions are only available at night.",
-      mafia_only: "? Only mafia can do that.",
-      no_mafia_target: "?? You cannot choose mafia.",
-      abstain_disabled: "?? Abstain is disabled in this channel.",
-      no_kill_disabled: "?? No?kill is disabled in this channel.",
-      doctor_only: "? Only the doctor can do that.",
-      detective_only: "? Only the detective can do that.",
-      bodyguard_only: "? Only the bodyguard can do that.",
-      bum_only: "? Only the Bum can do that.",
-      lawyer_only: "? Only the Lawyer can do that.",
-      stalker_only: "? Only the Stalker can do that.",
-      doctor_self_save_limit: "?? You can only save yourself once per game.",
-      vote_recorded: "? Your vote recorded: {target}.",
-      choice_recorded: "? Your choice: {target}.",
-      doctor_save: "? You save: {target}.",
-      detective_check: "? You check: {target}.",
-      detective_kill: "? You kill: {target}.",
-      detective_result: "?? Check result: {target} is {result}.",
-      result_mafia: "?? mafia",
-      result_not_mafia: "?? not mafia",
-      bodyguard_protect: "? You protect: {target}.",
-      bum_visit: "? You visit: {target}.",
-      lawyer_protect: "? You protect: {target}.",
-      stalker_kill: "? You hunt: {target}.",
+      no_game: ":info: No active game for this command.",
+      need_alive: ":info: You must mention a living player.",
+      day_only: ":info: Day actions are only available during the day.",
+      night_only: ":info: Night actions are only available at night.",
+      mafia_only: ":info: Only mafia can do that.",
+      no_mafia_target: ":info: You cannot choose mafia.",
+      abstain_disabled: ":abstain: Abstain is disabled in this channel.",
+      no_kill_disabled: ":info: No-kill is disabled in this channel.",
+      doctor_only: ":info: Only the doctor can do that.",
+      detective_only: ":info: Only the detective can do that.",
+      bodyguard_only: ":info: Only the bodyguard can do that.",
+      bum_only: ":info: Only the Bum can do that.",
+      lawyer_only: ":info: Only the Lawyer can do that.",
+      stalker_only: ":info: Only the Stalker can do that.",
+      doctor_self_save_limit: ":info: You can only save yourself once per game.",
+      vote_recorded: ":info: Your vote recorded: {target}.",
+      choice_recorded: ":info: Your choice: {target}.",
+      doctor_save: ":info: You save: {target}.",
+      detective_check: ":info: You check: {target}.",
+      detective_kill: ":info: You kill: {target}.",
+      detective_result: ":check: Check result: {target} is {result}.",
+      result_mafia: ":info: mafia",
+      result_not_mafia: ":info: not mafia",
+      bodyguard_protect: ":info: You protect: {target}.",
+      bum_visit: ":info: You visit: {target}.",
+      lawyer_protect: ":info: You protect: {target}.",
+      stalker_kill: ":info: You hunt: {target}.",
       unknown_command:
-        "? Unknown command. Use kill/save/check/protect/visit/defend/stalk @user.",
+        ":info: Unknown command. Use kill/save/check/protect/visit/defend/stalk @user.",
     },
     test: {
-      not_dev: "? Only the developer can use test commands.",
-      setup_usage: "?? Usage: `test setup #channel Alice,Bob,Charlie`",
-      list_usage: "?? Usage: `test list #channel`",
+      not_dev: ":info: Only the developer can use test commands.",
+      setup_usage: ":info: Usage: `test setup #channel Alice,Bob,Charlie`",
+      list_usage: ":info: Usage: `test list #channel`",
       setup_ok:
-        "? ?? Test lobby ready in {channel}. Players: {players}\nUse: `as <name> <action>`.",
-      duplicate_names: "? Duplicate test names: {names}.",
-      active_game: "?? Can't setup test mode during an active game.",
-      real_players: "?? Remove real players from the lobby before using test mode.",
-      no_game: "?? No test game found. Use `test setup` or specify #channel.",
-      list: "?? Test players in {channel}: {players}",
-      as_usage: "?? Usage: `as <name> <action> [target]`",
-      actor_not_found: "? Test player `{name}` not found.",
-      target_not_found: "? Target not found: `{name}`.",
-      roles_summary: "?? *Test roles* in {channel}:\n{list}",
+        ":info: :info: Test lobby ready in {channel}. Players: {players}\nUse: `as <name> <action>`.",
+      duplicate_names: ":info: Duplicate test names: {names}.",
+      active_game: ":info: Can't setup test mode during an active game.",
+      real_players: ":info: Remove real players from the lobby before using test mode.",
+      no_game: ":info: No test game found. Use `test setup` or specify #channel.",
+      list: ":info: Test players in {channel}: {players}",
+      as_usage: ":info: Usage: `as <name> <action> [target]`",
+      actor_not_found: ":info: Test player `{name}` not found.",
+      target_not_found: ":info: Target not found: `{name}`.",
+      roles_summary: ":info: *Test roles* in {channel}:\n{list}",
       actions_reminder_night:
-        "?? *Test actions (night)* in {channel}:\n{list}\nUse: `as <name> <action> <target>`",
+        ":info: *Test actions (night)* in {channel}:\n{list}\nUse: `as <name> <action> <target>`",
       actions_reminder_day:
-        "?? *Test actions (day)* in {channel}:\n{list}\nUse: `as <name> vote <target>` or `as <name> abstain`",
+        ":info: *Test actions (day)* in {channel}:\n{list}\nUse: `as <name> vote <target>` or `as <name> abstain`",
     },
   },
   ru: {
     role: {
-      mafia: "?? Мафия",
-      doctor: "????? Доктор",
-      detective: "??? Детектив",
-      mayor: "?? Мэр",
-      bodyguard: "??? Телохранитель",
-      town: "?? Мирный",
-      jester: "?? Шут",
-      godfather: "??? Крёстный отец",
-      lucky: "?? Счастливчик",
-      bum: "?? Бомж",
-      sergeant: "??? Сержант",
-      lawyer: "?? Адвокат",
-      stalker: "?? Сталкер",
+      mafia: ":info: Мафия",
+      doctor: ":info: Доктор",
+      detective: ":info: Детектив",
+      mayor: ":info: Мэр",
+      bodyguard: ":info: Телохранитель",
+      town: ":info: Мирный",
+      jester: ":info: Шут",
+      godfather: ":info: Крёстный отец",
+      lucky: ":info: Счастливчик",
+      bum: ":info: Бомж",
+      sergeant: ":info: Сержант",
+      lawyer: ":info: Адвокат",
+      stalker: ":info: Сталкер",
     },
     role_help: {
       mafia:
-        "?? Ты — Мафия. Ночью выбирайте цель и добейтесь паритета с городом.",
+        ":info: Ты — Мафия. Ночью выбирайте цель и добейтесь паритета с городом.",
       godfather:
-        "??? Ты — Крёстный отец. Ты мафия, но Детектив видит тебя как мирного.",
+        ":info: Ты — Крёстный отец. Ты мафия, но Детектив видит тебя как мирного.",
       doctor:
-        "????? Ты — Доктор. Ночью выбираешь кого спасти (включая себя в пределах лимита).",
+        ":info: Ты — Доктор. Ночью выбираешь кого спасти (включая себя в пределах лимита).",
       detective:
-        "??? Ты — Детектив. Ночью можешь либо проверить игрока, либо убить цель (только одно действие).",
+        ":info: Ты — Детектив. Ночью можешь либо проверить игрока, либо убить цель (только одно действие).",
       mayor:
-        "?? Ты — Мэр. Твой дневной голос считается за 2.",
+        ":info: Ты — Мэр. Твой дневной голос считается за 2.",
       bodyguard:
-        "??? Ты — Телохранитель. Защищай цель; если мафия атакует её, ты принимаешь удар.",
+        ":info: Ты — Телохранитель. Защищай цель; если мафия атакует её, ты принимаешь удар.",
       jester:
-        "?? Ты — Шут. Если тебя казнят голосованием — ты выигрываешь мгновенно.",
+        ":info: Ты — Шут. Если тебя казнят голосованием — ты выигрываешь мгновенно.",
       town:
-        "?? Ты — Мирный житель. Найди мафию и казни её днём.",
+        ":info: Ты — Мирный житель. Найди мафию и казни её днём.",
       lucky:
-        "?? Ты — Счастливчик. Каждую ночь у тебя 50% шанс выжить при убийстве.",
+        ":info: Ты — Счастливчик. Каждую ночь у тебя 50% шанс выжить при убийстве.",
       bum:
-        "?? Ты — Бомж. Ночью заходишь к игроку; если его убьют, ты увидишь убийцу.",
+        ":info: Ты — Бомж. Ночью заходишь к игроку; если его убьют, ты увидишь убийцу.",
       sergeant:
-        "??? Ты — Сержант. Детектив делится с тобой результатами. Если детектив погибнет, ты получишь его действия.",
+        ":info: Ты — Сержант. Детектив делится с тобой результатами. Если детектив погибнет, ты получишь его действия.",
       lawyer:
-        "?? Ты — Адвокат. Ночью защищаешь игрока; если защищаешь мафию, детектив видит её как мирную. Твоя цель — победа мафии.",
+        ":info: Ты — Адвокат. Ночью защищаешь игрока; если защищаешь мафию, детектив видит её как мирную. Твоя цель — победа мафии.",
       stalker:
-        "?? Ты — Сталкер. У тебя контракт на роль. Убей цель лично, чтобы получить победу.",
+        ":info: Ты — Сталкер. У тебя контракт на роль. Убей цель лично, чтобы получить победу.",
     },
     time: {
       sec: "{seconds} сек.",
@@ -720,83 +720,83 @@ const I18N = {
       min_sec: "{minutes} мин {seconds} сек.",
     },
     button: {
-      join: "? Войти",
-      leave: "? Выйти",
-      start: "?? Старт",
-      extend: "? Продлить +2м",
-      end: "?? Завершить",
-      ready: "? Готов",
-      abstain: "?? Воздержаться",
-      no_kill: "?? Не убивать",
-      role_help: "?? Что делать?",
-      detective_check: "?? Проверить",
-      detective_kill: "?? Убить",
-      prev: "?? Назад",
-      next: "?? Вперёд",
-      page: "?? Стр. {page}/{total}",
-      help_add: "? Как добавить бота",
-      help_commands: "?? Команды",
-      help_settings: "?? Настройки",
-      find_games: "?? Найти игры",
-      my_channels: "??? Мои каналы",
-      faq: "? FAQ",
-      back: "?? Назад",
-      public: "?? Публичный",
-      private: "?? Частный",
-      filter_active: "?? Активные",
-      filter_recruiting: "?? В наборе",
-      filter_inactive: "? Не активные",
-      filter_lang_all: "?? Все",
-      filter_lang_en: "???? ENG",
-      filter_lang_ru: "???? RU",
-      lang_en: "???? English",
-      lang_ru: "???? Русский",
+      join: ":info: Войти",
+      leave: ":info: Выйти",
+      start: ":info: Старт",
+      extend: ":info: Продлить +2м",
+      end: ":info: Завершить",
+      ready: ":info: Готов",
+      abstain: ":info: Воздержаться",
+      no_kill: ":info: Не убивать",
+      role_help: ":info: Что делать?",
+      detective_check: ":info: Проверить",
+      detective_kill: ":info: Убить",
+      prev: ":info: Назад",
+      next: ":info: Вперёд",
+      page: ":info: Стр. {page}/{total}",
+      help_add: ":info: Как добавить бота",
+      help_commands: ":info: Команды",
+      help_settings: ":info: Настройки",
+      find_games: ":info: Найти игры",
+      my_channels: ":info: Мои каналы",
+      faq: ":help: FAQ",
+      back: ":info: Назад",
+      public: ":info: Публичный",
+      private: ":info: Частный",
+      filter_active: ":info: Активные",
+      filter_recruiting: ":info: В наборе",
+      filter_inactive: ":info: Не активные",
+      filter_lang_all: ":info: Все",
+      filter_lang_en: ":info: ENG",
+      filter_lang_ru: ":info: RU",
+      lang_en: ":info: English",
+      lang_ru: ":info: Русский",
     },
     dashboard: {
-      title: "?? Панель игры",
-      phase: "?? Фаза: {phase}",
-      timer: "? Таймер: {time}",
-      alive: "?? Живые ({count}): {list}",
-      ready: "? Готовы: {ready}/{total}",
+      title: ":info: Панель игры",
+      phase: ":info: Фаза: {phase}",
+      timer: ":info: Таймер: {time}",
+      alive: ":info: Живые ({count}): {list}",
+      ready: ":info: Готовы: {ready}/{total}",
     },
     home: {
-      title: "?? MafiaBot",
-      tagline: "?? Ваш центр управления мафией в Slack. (Разработчик: @bob)",
+      title: ":mafia: MafiaBot",
+      tagline: ":info: Ваш центр управления мафией в Slack. (Разработчик: @bob)",
       quickstart:
-        "*?? Быстрый старт*\n" +
-        "1?? Добавьте меня в канал: `/invite @MafiaBot`\n" +
-        "2?? Создайте лобби: `@MafiaBot create`\n" +
-        "3?? Игроки жмут `Join`, хост жмёт `Start` или все `Ready`",
+        "*:info: Быстрый старт*\n" +
+        "1 :info: Добавьте меня в канал: `/invite @MafiaBot`\n" +
+        "2 :info: Создайте лобби: `@MafiaBot create`\n" +
+        "3 :info: Игроки жмут `Join`, хост жмёт `Start` или все `Ready`",
       controls:
-        "*?? Управление лобби*\n" +
+        "*:info: Управление лобби*\n" +
         "- Кнопки: `Join`, `Leave`, `Ready`, `Start`, `Extend`, `End`\n" +
         "- Команды: `@MafiaBot join`, `leave`, `start`, `extend 2`, `status`, `config`",
       gameplay:
-        "*?? Во время игры*\n" +
+        "*:info: Во время игры*\n" +
         "- Ночные действия и дневное голосование приходят в личку\n" +
         "- `whisper <текст>` в личке раз в день\n" +
         "- После смерти есть «последние слова» в личке",
       features:
-        "*? Возможности*\n" +
+        "*:info: Возможности*\n" +
         "- Роли: Мафия, Доктор, Детектив, Мэр, Телохранитель, Шут, Крёстный отец, Счастливчик, Бомж, Сержант, Адвокат, Сталкер\n" +
-        "- Анонимные голосования, авто?таймеры, сохранение в SQLite\n" +
+        "- Анонимные голосования, авто-таймеры, сохранение в SQLite\n" +
         "- Комната мафии + кладбище (если есть права)",
       tips:
-        "*?? Подсказки*\n" +
+        "*:info: Подсказки*\n" +
         "- Если несколько игр, указывайте `#channel` в личных командах\n" +
         "- Смена языка в личке: `lang en` / `lang ru`\n" +
         "- Редактирование настроек: `Мои каналы` в личке\n" +
         "- Открыть FAQ: `FAQ` в личке",
-      stats_title: "?? Ваша статистика",
+      stats_title: ":info: Ваша статистика",
       stats_line:
         "Игры: {games} • Победы: {wins} • Поражения: {losses} • Винрейт: {rate}%",
-      channel_stats_title: "?? В этом канале",
+      channel_stats_title: ":info: В этом канале",
       channel_stats_line:
         "Игры: {games} • Победы: {wins} • Поражения: {losses} • Винрейт: {rate}%",
-      role_stats_title: "?? Статистика по ролям",
-      role_stats_empty: "?? Пока нет статистики по ролям.",
-      current_title: "??? Текущая игра",
-      current_none: "?? Активной игры нет.",
+      role_stats_title: ":info: Статистика по ролям",
+      role_stats_empty: ":info: Пока нет статистики по ролям.",
+      current_title: ":info: Текущая игра",
+      current_none: ":info: Активной игры нет.",
       current_line:
         "Канал: {channel}\n" +
         "Фаза: {phase}\n" +
@@ -804,403 +804,403 @@ const I18N = {
         "Живые: {alive}\n" +
         "Вы: {status}\n" +
         "Роль: {role}",
-      status_alive: "? Жив",
-      status_dead: "? Выбыли",
-      role_unknown: "?? Неизвестно",
-      history_title: "?? Последние 3 ночи",
-      history_empty: "?? Пока нет итогов ночи.",
-      history_line: "?? Ночь {round}: {text}",
+      status_alive: ":info: Жив",
+      status_dead: ":info: Выбыли",
+      role_unknown: ":info: Неизвестно",
+      history_title: ":info: Последние 3 ночи",
+      history_empty: ":info: Пока нет итогов ночи.",
+      history_line: ":info: Ночь {round}: {text}",
     },
     find: {
-      prompt_public: "?? Сделать {channel} публичным в «Найти игры»?",
-      set_public: "? {channel} теперь публичный в «Найти игры».",
-      set_private: "?? {channel} приватный и не будет отображаться.",
+      prompt_public: ":info: Сделать {channel} публичным в «Найти игры»?",
+      set_public: ":info: {channel} теперь публичный в «Найти игры».",
+      set_private: ":info: {channel} приватный и не будет отображаться.",
       private_not_allowed:
-        "? Приватные каналы нельзя показывать в «Найти игры».",
-      title: "?? Найти игры",
-      empty: "?? Нет каналов для этого фильтра.",
-      status_active: "?? Активна — {phase} {round} • Живых {alive}",
-      status_recruiting: "?? В наборе — {count}/{min}, старт через {time}",
-      status_inactive: "? Не активна — игра не идёт",
-      filters: "??? Фильтр:",
-      filter_lang: "?? Язык:",
-      lang_label_en: "???? ENG",
-      lang_label_ru: "???? RU",
+        ":info: Приватные каналы нельзя показывать в «Найти игры».",
+      title: ":info: Найти игры",
+      empty: ":info: Нет каналов для этого фильтра.",
+      status_active: ":info: Активна — {phase} {round} • Живых {alive}",
+      status_recruiting: ":info: В наборе — {count}/{min}, старт через {time}",
+      status_inactive: ":info: Не активна — игра не идёт",
+      filters: ":info: Фильтр:",
+      filter_lang: ":info: Язык:",
+      lang_label_en: ":info: ENG",
+      lang_label_ru: ":info: RU",
     },
     faq: {
-      title: "? FAQ",
+      title: ":help: FAQ",
       intro:
-        "?? Выберите вопрос ниже. Можно написать в личку `faq <id>`, чтобы открыть конкретный ответ.",
-      id_label: "?? FAQ ID: `faq {id}`",
-      not_found: "?? Вопрос не найден. Открываю список FAQ.",
-      command_open: "? Открыть FAQ:",
-      command_detail: "? Открыть вопрос FAQ `{id}`:",
-      open_button: "? Открыть FAQ",
+        ":info: Выберите вопрос ниже. Можно написать в личку `faq <id>`, чтобы открыть конкретный ответ.",
+      id_label: ":help: FAQ ID: `faq {id}`",
+      not_found: ":info: Вопрос не найден. Открываю список FAQ.",
+      command_open: ":info: Открыть FAQ:",
+      command_detail: ":info: Открыть вопрос FAQ `{id}`:",
+      open_button: ":info: Открыть FAQ",
     },
     my_channels: {
-      title: "??? Мои каналы",
-      empty: "?? Пока нет каналов.",
-      status_public: "?? Публичный",
-      status_private: "?? Частный",
-      not_owner: "? Вы не владелец этого канала.",
-      saved: "? Настройки канала сохранены.",
-      edit_intro: "?? Настройка {channel}",
+      title: ":info: Мои каналы",
+      empty: ":info: Пока нет каналов.",
+      status_public: ":info: Публичный",
+      status_private: ":info: Частный",
+      not_owner: ":info: Вы не владелец этого канала.",
+      saved: ":info: Настройки канала сохранены.",
+      edit_intro: ":info: Настройка {channel}",
     },
     settings: {
-      title: "?? Настройки канала",
-      privacy_label: "?? Видимость в «Найти игры»",
-      privacy_public: "?? Публичный",
-      privacy_private: "?? Частный",
-      channel_lang: "?? Язык канала",
+      title: ":info: Настройки канала",
+      privacy_label: ":info: Видимость в «Найти игры»",
+      privacy_public: ":info: Публичный",
+      privacy_private: ":info: Частный",
+      channel_lang: ":info: Язык канала",
       channel_lang_en: "English (ENG)",
       channel_lang_ru: "Русский (RU)",
-      day_minutes: "?? День (мин.)",
-      night_minutes: "?? Ночь (мин.)",
-      lobby_minutes: "?? Лобби (мин.)",
-      min_players: "?? Минимум игроков",
-      extend_policy: "?? Кто может продлевать?",
-      extend_host: "?? Только хост",
-      extend_any: "?? Все",
-      warning_1: "?? Предупреждение #1 (сек.)",
-      warning_2: "?? Предупреждение #2 (сек.)",
-      auto_shorten: "?? Автосокращение фазы",
-      whisper_enabled: "?? Шёпот включён",
-      allow_abstain: "?? Разрешить воздержание",
-      allow_no_kill: "?? Разрешить «без убийства»",
-      doctor_self_save: "????? Лимит self?save",
-      toggle_on: "? Вкл",
-      toggle_off: "? Выкл",
-      submit: "? Сохранить",
-      cancel: "? Отмена",
-      invalid_number: "?? Введите корректное число.",
-      invalid_min_players: "?? Минимум игроков должен быть >= 4.",
-      invalid_warning: "?? Предупреждения должны быть > 0.",
-      invalid_self_save: "?? Лимит self?save должен быть >= 0.",
+      day_minutes: ":info: День (мин.)",
+      night_minutes: ":info: Ночь (мин.)",
+      lobby_minutes: ":info: Лобби (мин.)",
+      min_players: ":info: Минимум игроков",
+      extend_policy: ":info: Кто может продлевать?",
+      extend_host: ":info: Только хост",
+      extend_any: ":info: Все",
+      warning_1: ":info: Предупреждение #1 (сек.)",
+      warning_2: ":info: Предупреждение #2 (сек.)",
+      auto_shorten: ":info: Автосокращение фазы",
+      whisper_enabled: ":info: Шёпот включён",
+      allow_abstain: ":info: Разрешить воздержание",
+      allow_no_kill: ":info: Разрешить «без убийства»",
+      doctor_self_save: ":info: Лимит self-save",
+      toggle_on: ":info: Вкл",
+      toggle_off: ":info: Выкл",
+      submit: ":info: Сохранить",
+      cancel: ":info: Отмена",
+      invalid_number: ":info: Введите корректное число.",
+      invalid_min_players: ":info: Минимум игроков должен быть >= 4.",
+      invalid_warning: ":info: Предупреждения должны быть > 0.",
+      invalid_self_save: ":info: Лимит self-save должен быть >= 0.",
     },
     dm: {
       lang_prompt:
-        "?? Выберите язык кнопками ниже. Позже можно изменить командой `lang en` / `lang ru`.",
-      lang_set_en: "? Language set to English.",
-      lang_set_ru: "? Язык установлен: русский.",
-      lang_usage: "?? Использование: `lang en` или `lang ru`.",
+        ":info: Выберите язык кнопками ниже. Позже можно изменить командой `lang en` / `lang ru`.",
+      lang_set_en: ":info: Language set to English.",
+      lang_set_ru: ":info: Язык установлен: русский.",
+      lang_usage: ":info: Использование: `lang en` или `lang ru`.",
       lang_change_command:
-        "?? Язык уже установлен. Измените его командой `lang en` / `lang ru`.",
+        ":info: Язык уже установлен. Измените его командой `lang en` / `lang ru`.",
       help_intro_tg:
-        "?? Привет! Я MafiaBot для Telegram.\n" +
-        "?? Как начать:\n" +
+        ":info: Привет! Я MafiaBot для Telegram.\n" +
+        ":info: Как начать:\n" +
         "1) Добавьте меня в группу\n" +
         "2) В группе: `/create` чтобы открыть лобби\n" +
         "3) Игроки `/join`, хост `/start`\n" +
-        "?? Ночные/дневные действия приходят сюда кнопками",
+        ":info: Ночные/дневные действия приходят сюда кнопками",
       help_add_tg:
-        "? Добавьте меня в Telegram?группу. По желанию дайте админ?права, чтобы удалять сообщения выбывших.",
+        ":info: Добавьте меня в Telegram-группу. По желанию дайте админ-права, чтобы удалять сообщения выбывших.",
       help_commands_tg:
-        "?? Команды в группе: `/create`, `/join`, `/leave`, `/start`, `/extend 2`, `/status`, `/config`, `/end`",
+        ":info: Команды в группе: `/create`, `/join`, `/leave`, `/start`, `/extend 2`, `/status`, `/config`, `/end`",
       help_settings_tg:
-        "?? Настройки: `/config` в группе и `/mychannels` в личке для дефолтных параметров.",
+        ":info: Настройки: `/config` в группе и `/mychannels` в личке для дефолтных параметров.",
       help_intro:
-        "?? Привет! Я MafiaBot.\n" +
-        "?? Как начать:\n" +
+        ":info: Привет! Я MafiaBot.\n" +
+        ":info: Как начать:\n" +
         "1) Добавьте меня в нужный канал: `/invite @MafiaBot`\n" +
         "2) В канале создайте лобби: `@MafiaBot create` (или кнопка)\n" +
         "3) Игроки заходят через `Join`, хост запускает `Start`\n" +
-        "?? Если у вас несколько игр, указывайте канал в личке: `vote @user #channel`\n" +
-        "?? Личка: `whisper <текст>` (раз в день)\n" +
-        "?? Смена языка: `lang en` / `lang ru`.\n" +
-        "?? Поиск игр: кнопка `Найти игры` в личке.\n" +
-        "??? Кнопка `Мои каналы` — редактирование настроек.\n" +
-        "? Кнопка `FAQ` — ответы на частые вопросы.",
+        ":info: Если у вас несколько игр, указывайте канал в личке: `vote @user #channel`\n" +
+        ":info: Личка: `whisper <текст>` (раз в день)\n" +
+        ":info: Смена языка: `lang en` / `lang ru`.\n" +
+        ":info: Поиск игр: кнопка `Найти игры` в личке.\n" +
+        ":info: Кнопка `Мои каналы` — редактирование настроек.\n" +
+        ":info: Кнопка `FAQ` — ответы на частые вопросы.",
       help_add:
-        "? Чтобы добавить меня в канал:\n" +
+        ":info: Чтобы добавить меня в канал:\n" +
         "1) Откройте нужный канал\n" +
         "2) Напишите `/invite @MafiaBot`\n" +
         "Далее создайте лобби командой `@MafiaBot create` или кнопкой.",
       help_commands:
-        "?? Команды в канале:\n" +
+        ":info: Команды в канале:\n" +
         "- `@MafiaBot create` — создать лобби\n" +
         "- `@MafiaBot join` / `leave`\n" +
         "- `@MafiaBot start` — старт (хост)\n" +
         "- `@MafiaBot extend 2` — продлить лобби\n" +
         "- `@MafiaBot status`, `config`, `end`\n" +
-        "?? Личка: `whisper <текст>` (раз в день)\n" +
-        "?? Смена языка: `lang en` / `lang ru`.\n" +
-        "?? Поиск игр: кнопка `Найти игры` в личке.\n" +
-        "??? Мои каналы: `mychannels` в личке.\n" +
-        "??? Кнопка `Мои каналы` — редактирование настроек.\n" +
-        "? Кнопка `FAQ` — ответы на частые вопросы.",
+        ":info: Личка: `whisper <текст>` (раз в день)\n" +
+        ":info: Смена языка: `lang en` / `lang ru`.\n" +
+        ":info: Поиск игр: кнопка `Найти игры` в личке.\n" +
+        ":info: Мои каналы: `mychannels` в личке.\n" +
+        ":info: Кнопка `Мои каналы` — редактирование настроек.\n" +
+        ":info: Кнопка `FAQ` — ответы на частые вопросы.",
       help_settings:
-        "?? Настройки (только в лобби):\n" +
+        ":info: Настройки (только в лобби):\n" +
         "- `@MafiaBot config day 5`\n" +
         "- `@MafiaBot config night 2`\n" +
         "- `@MafiaBot config lobby 5`\n" +
         "- `@MafiaBot config min 4`\n" +
         "- `@MafiaBot config extend host|any`\n" +
-        "?? Смена языка: `lang en` / `lang ru`.\n" +
-        "?? Поиск игр: кнопка `Найти игры` в личке.\n" +
-        "??? Кнопка `Мои каналы` — редактирование настроек.\n" +
-        "? Кнопка `FAQ` — ответы на частые вопросы.",
+        ":info: Смена языка: `lang en` / `lang ru`.\n" +
+        ":info: Поиск игр: кнопка `Найти игры` в личке.\n" +
+        ":info: Кнопка `Мои каналы` — редактирование настроек.\n" +
+        ":info: Кнопка `FAQ` — ответы на частые вопросы.",
     },
     dev: {
       panel: {
-        title: "??? Панель разработчика",
-        status_on: "?? Обновление: ВКЛ",
-        status_off: "?? Обновление: ВЫКЛ",
-        button_enable: "??? Включить обновление",
-        button_disable: "??? Выключить обновление",
+        title: ":info: Панель разработчика",
+        status_on: ":info: Обновление: ВКЛ",
+        status_off: ":info: Обновление: ВЫКЛ",
+        button_enable: ":info: Включить обновление",
+        button_disable: ":info: Выключить обновление",
       },
-      not_authorized: "? У вас нет доступа к командам разработчика.",
-      code_invalid: "? Неверный код разработчика.",
-      help: "??? Dev: `dev <code>` • `test setup #channel Alice,Bob` • `as Alice vote Bob`",
+      not_authorized: ":info: У вас нет доступа к командам разработчика.",
+      code_invalid: ":info: Неверный код разработчика.",
+      help: ":info: Dev: `dev <code>` • `test setup #channel Alice,Bob` • `as Alice vote Bob`",
     },
     maintenance: {
-      reply: "? MafiaBot обновляется и скоро вернётся.",
-      blocked: "?? Идёт обновление. Новые лобби временно недоступны.",
-      lobby_closed: "?? Лобби закрыто из?за обновления.",
-      done: "? Все активные игры завершены. Можно обновлять бота.",
+      reply: ":mafia: MafiaBot обновляется и скоро вернётся.",
+      blocked: ":info: Идёт обновление. Новые лобби временно недоступны.",
+      lobby_closed: ":info: Лобби закрыто из-за обновления.",
+      done: ":info: Все активные игры завершены. Можно обновлять бота.",
     },
     last_words: {
       prompt:
-        "??? Вы выбыли. Напишите одно последнее сообщение в течение 2 минут — оно будет опубликовано в {channel}.",
-      received: "? Ваши последние слова опубликованы.",
-      expired: "? Время вышло. Последние слова не отправлены.",
-      post: "??? Последние слова от {name}: {text}",
+        ":info: Вы выбыли. Напишите одно последнее сообщение в течение 2 минут — оно будет опубликовано в {channel}.",
+      received: ":info: Ваши последние слова опубликованы.",
+      expired: ":info: Время вышло. Последние слова не отправлены.",
+      post: ":info: Последние слова от {name}: {text}",
     },
     dead: {
-      no_talk: "?? Вы выбыли и не можете писать в этом канале.",
-      message_deleted: "?? Вы выбыли и не можете писать в этом канале.",
+      no_talk: ":info: Вы выбыли и не можете писать в этом канале.",
+      message_deleted: ":info: Вы выбыли и не можете писать в этом канале.",
     },
     graveyard: {
       unavailable:
-        "?? Кладбище недоступно (нет прав на создание/приглашение).",
+        ":info: Кладбище недоступно (нет прав на создание/приглашение).",
     },
     mafia_room: {
-      intro: "??? Мафия?комната создана. Обсуждайте здесь ночью.",
+      intro: ":info: Мафия-комната создана. Обсуждайте здесь ночью.",
     },
     whisper: {
-      usage: "?? Использование: `whisper <текст>`",
-      not_day: "?? Шёпот доступен только днём.",
-      disabled: "?? Шёпот отключён для этого канала.",
-      already_used: "?? Вы уже использовали шёпот сегодня.",
-      sent: "? Ваш шёпот отправлен анонимно.",
-      post: "?? Анонимный шёпот: {text}",
+      usage: ":info: Использование: `whisper <текст>`",
+      not_day: ":info: Шёпот доступен только днём.",
+      disabled: ":info: Шёпот отключён для этого канала.",
+      already_used: ":info: Вы уже использовали шёпот сегодня.",
+      sent: ":info: Ваш шёпот отправлен анонимно.",
+      post: ":info: Анонимный шёпот: {text}",
     },
     lobby: {
-      title: "?? Лобби мафии",
-      host: "?? Хост: {host}",
-      players: "?? Игроки: {count}/{min}",
-      ready: "? Готовы: {ready}/{total}",
-      start_in: "? Старт через: {time}",
+      title: ":info: Лобби мафии",
+      host: ":info: Хост: {host}",
+      players: ":info: Игроки: {count}/{min}",
+      ready: ":info: Готовы: {ready}/{total}",
+      start_in: ":info: Старт через: {time}",
       created:
-        "?? Создано лобби. Хост: {host}. Присоединяйтесь через `@MafiaBot join` или кнопку.",
-      joined: "? {user} присоединился. Игроков: {count}",
-      left: "? {user} вышел. Игроков: {count}",
-      empty_closed: "?? Лобби пустое. Игра удалена.",
+        ":info: Создано лобби. Хост: {host}. Присоединяйтесь через `@MafiaBot join` или кнопку.",
+      joined: ":info: {user} присоединился. Игроков: {count}",
+      left: ":info: {user} вышел. Игроков: {count}",
+      empty_closed: ":info: Лобби пустое. Игра удалена.",
       closed_not_enough:
-        "?? Лобби закрыто: нужно минимум {min} игроков, сейчас {count}.",
-      timeout_start: "? Время лобби истекло. Начинаем игру!",
-      host_start: "?? Хост запускает игру.",
-      ready_start: "? Все игроки готовы. Начинаем игру!",
-      extended: "? Лобби продлено на {minutes} мин.",
-      closed: "? Лобби закрыто.",
-      starting: "?? Лобби закрыто. Игра стартует.",
-      end: "?? Игра завершена.",
-      panel_summary: "?? Лобби: игроков {count}/{min}.",
+        ":info: Лобби закрыто: нужно минимум {min} игроков, сейчас {count}.",
+      timeout_start: ":info: Время лобби истекло. Начинаем игру!",
+      host_start: ":info: Хост запускает игру.",
+      ready_start: ":info: Все игроки готовы. Начинаем игру!",
+      extended: ":info: Лобби продлено на {minutes} мин.",
+      closed: ":info: Лобби закрыто.",
+      starting: ":info: Лобби закрыто. Игра стартует.",
+      end: ":info: Игра завершена.",
+      panel_summary: ":info: Лобби: игроков {count}/{min}.",
     },
     warn: {
-      day: "?? До конца дня осталось {seconds} сек.",
-      night: "?? До конца ночи осталось {seconds} сек.",
-      lobby: "?? До автозапуска лобби осталось {seconds} сек.",
-      shortened_day: "? День сокращён из?за высокой активности.",
-      shortened_night: "? Ночь сокращена из?за высокой активности.",
+      day: ":info: До конца дня осталось {seconds} сек.",
+      night: ":info: До конца ночи осталось {seconds} сек.",
+      lobby: ":info: До автозапуска лобби осталось {seconds} сек.",
+      shortened_day: ":info: День сокращён из-за высокой активности.",
+      shortened_night: ":info: Ночь сокращена из-за высокой активности.",
     },
     reminder: {
-      night_action: "ночное действие ??",
-      vote: "голосование ???",
-      text: "?? Напоминание: завершите {action} для игры в {channel}.",
+      night_action: "ночное действие :info:",
+      vote: "голосование ?",
+      text: ":info: Напоминание: завершите {action} для игры в {channel}.",
     },
     phase: {
-      night_start: "?? Ночь {round}. Город засыпает...",
-      day_start: "?? День {round}. Город просыпается...",
+      night_start: ":info: Ночь {round}. Город засыпает...",
+      day_start: ":info: День {round}. Город просыпается...",
     },
     night: {
-      ended_killed: "?? Ночь окончена. Убиты: {targets}.",
-      ended_none: "?? Ночь окончена. Никто не погиб.",
-      bodyguard: "??? Телохранитель принял удар на себя.",
+      ended_killed: ":info: Ночь окончена. Убиты: {targets}.",
+      ended_none: ":info: Ночь окончена. Никто не погиб.",
+      bodyguard: ":info: Телохранитель принял удар на себя.",
     },
     day: {
-      ended_executed: "??? Голосование завершено. Казнен: {target} ({role}).",
-      ended_tie: "??? Голосование завершено. Ничья, никто не казнен.",
+      ended_executed: ":info: Голосование завершено. Казнен: {target} ({role}).",
+      ended_tie: ":info: Голосование завершено. Ничья, никто не казнен.",
     },
     auto: {
-      applied: "?? Автодействия применены.",
+      applied: ":info: Автодействия применены.",
     },
     winner: {
-      mafia: "?? Победа мафии!",
-      town: "?? Победа мирных!",
-      jester: "?? Победа шута!",
+      mafia: ":info: Победа мафии!",
+      town: ":info: Победа мирных!",
+      jester: ":info: Победа шута!",
       summary: "{winner}\nМафия: {mafia}\nМирные: {town}",
       summary_jester: "{winner}\nШут: {jester}\nМафия: {mafia}\nМирные: {town}",
     },
     prompt: {
-      mafia: "?? Игра в {channel}. Выберите цель для мафии.",
-      doctor: "????? Игра в {channel}. Кого спасти этой ночью?",
-      detective_mode: "??? Выберите действие на эту ночь:",
-      detective: "??? Игра в {channel}. Кого проверить?",
-      detective_kill: "?? Игра в {channel}. Кого убить?",
-      bodyguard: "??? Игра в {channel}. Кого защищать?",
-      bum: "?? Игра в {channel}. К кому зайти этой ночью?",
-      lawyer: "?? Игра в {channel}. Кого защищать?",
-      stalker: "?? Контракт: {role}. Выберите цель.",
-      day: "??? Игра в {channel}. Ваш голос за исключение.",
+      mafia: ":info: Игра в {channel}. Выберите цель для мафии.",
+      doctor: ":info: Игра в {channel}. Кого спасти этой ночью?",
+      detective_mode: ":info: Выберите действие на эту ночь:",
+      detective: ":info: Игра в {channel}. Кого проверить?",
+      detective_kill: ":info: Игра в {channel}. Кого убить?",
+      bodyguard: ":info: Игра в {channel}. Кого защищать?",
+      bum: ":info: Игра в {channel}. К кому зайти этой ночью?",
+      lawyer: ":info: Игра в {channel}. Кого защищать?",
+      stalker: ":info: Контракт: {role}. Выберите цель.",
+      day: ":info: Игра в {channel}. Ваш голос за исключение.",
     },
     select: {
-      player: "?? Выберите игрока",
-      target: "?? Выберите цель",
+      player: ":info: Выберите игрока",
+      target: ":info: Выберите цель",
     },
     help: {
       commands:
-        "?? Команды: create, join, leave, start, status, end, config, extend. Голосование и ночные действия приходят в личку.",
+        ":info: Команды: create, join, leave, start, status, end, config, extend. Голосование и ночные действия приходят в личку.",
     },
     config: {
       summary:
-        "?? Настройки: day={day}m, night={night}m, lobby={lobby}m, min={min}, extend={extend}",
+        ":info: Настройки: day={day}m, night={night}m, lobby={lobby}m, min={min}, extend={extend}",
     },
     status: {
-      text: "?? Статус: {state}. Хост: {host}. Живые: {alive}",
+      text: ":info: Статус: {state}. Хост: {host}. Живые: {alive}",
     },
     state: {
-      lobby: "?? лобби",
-      day: "?? день",
-      night: "?? ночь",
-      ended: "?? завершено",
+      lobby: ":info: лобби",
+      day: ":info: день",
+      night: ":info: ночь",
+      ended: ":info: завершено",
     },
     err: {
-      channel_unknown: "? Не удалось определить канал.",
-      already_in_other: "? Вы уже находитесь в лобби или игре в {channel}.",
-      lobby_not_active: "?? Лобби не активно.",
-      lobby_exists: "?? Игра уже создана в этом канале.",
-      lobby_none: "? Сейчас нет лобби. Создайте: @MafiaBot create",
-      already_in: "?? Вы уже в игре.",
-      lobby_only: "? Покинуть можно только лобби.",
-      not_in_lobby: "? Вас нет в лобби.",
-      lobby_start_none: "?? Нет активного лобби для старта.",
-      only_host_start: "? Запускать игру может только хост.",
-      need_min_players: "?? Нужно минимум {min} игроков.",
-      game_not_created: "? Игра не создана.",
-      config_lobby_only: "?? Настройка доступна только в лобби.",
-      config_host_only: "? Настраивать игру может только хост.",
-      config_usage_extend: "?? Использование: @MafiaBot config extend host|any",
+      channel_unknown: ":info: Не удалось определить канал.",
+      already_in_other: ":info: Вы уже находитесь в лобби или игре в {channel}.",
+      lobby_not_active: ":info: Лобби не активно.",
+      lobby_exists: ":info: Игра уже создана в этом канале.",
+      lobby_none: ":info: Сейчас нет лобби. Создайте: @MafiaBot create",
+      already_in: ":info: Вы уже в игре.",
+      lobby_only: ":info: Покинуть можно только лобби.",
+      not_in_lobby: ":info: Вас нет в лобби.",
+      lobby_start_none: ":info: Нет активного лобби для старта.",
+      only_host_start: ":info: Запускать игру может только хост.",
+      need_min_players: ":info: Нужно минимум {min} игроков.",
+      game_not_created: ":info: Игра не создана.",
+      config_lobby_only: ":info: Настройка доступна только в лобби.",
+      config_host_only: ":info: Настраивать игру может только хост.",
+      config_usage_extend: ":info: Использование: @MafiaBot config extend host|any",
       config_usage_numbers:
-        "?? Использование: @MafiaBot config day 5 | night 2 | lobby 5 | min 4",
-      config_options: "?? Доступные настройки: day, night, lobby, min, extend",
-      extend_lobby_only: "?? Продлевать можно только в лобби.",
-      extend_not_allowed: "? Продлевать может только хост или участник по настройке.",
-      no_active_game: "?? Нет активной игры.",
-      only_host_end: "? Завершить игру может только хост.",
-      unknown_command: "? Неизвестная команда. Напишите @MafiaBot help",
+        ":info: Использование: @MafiaBot config day 5 | night 2 | lobby 5 | min 4",
+      config_options: ":info: Доступные настройки: day, night, lobby, min, extend",
+      extend_lobby_only: ":info: Продлевать можно только в лобби.",
+      extend_not_allowed: ":info: Продлевать может только хост или участник по настройке.",
+      no_active_game: ":info: Нет активной игры.",
+      only_host_end: ":info: Завершить игру может только хост.",
+      unknown_command: ":info: Неизвестная команда. Напишите @MafiaBot help",
     },
     ok: {
-      settings_updated: "? Настройки обновлены.",
+      settings_updated: ":info: Настройки обновлены.",
     },
     action: {
-      role_dm: "?? Ваша роль в игре {channel}: *{role}*.",
-      failed: "? Не удалось обработать выбор.",
-      game_ended: "?? Игра уже завершена.",
-      not_in_game: "? Вы не участвуете или выбыли.",
-      not_day: "?? Сейчас не день.",
-      choose_alive: "?? Нужно выбрать живого игрока.",
-      already_acted: "?? Вы уже сделали действие в этой фазе.",
-      already_voted: "?? Ваш голос уже зафиксирован.",
-      vote_recorded: "? Ваш голос учтен: {target}.",
-      vote_abstain: "? Вы воздержались.",
-      not_night: "?? Сейчас не ночь.",
-      mafia_only: "? Команда доступна только мафии.",
-      no_mafia_target: "?? Нельзя выбрать мафию.",
-      abstain_disabled: "?? Воздержание отключено в этом канале.",
-      no_kill_disabled: "?? «Без убийства» отключено в этом канале.",
-      choice_recorded: "? Ваш выбор: {target}.",
-      no_kill: "? Ваш выбор: не убивать.",
-      doctor_only: "? Команда доступна только доктору.",
-      detective_only: "? Команда доступна только детективу.",
-      bodyguard_only: "? Команда доступна только телохранителю.",
-      bum_only: "? Команда доступна только Бомжу.",
-      lawyer_only: "? Команда доступна только Адвокату.",
-      stalker_only: "? Команда доступна только Сталкеру.",
-      doctor_self_save_limit: "?? Себя можно спасать только один раз за игру.",
-      doctor_save: "? Вы спасаете: {target}.",
-      detective_check: "? Вы проверяете: {target}.",
-      detective_kill: "? Вы убиваете: {target}.",
-      detective_result: "?? Результат проверки: {target} — {result}.",
-      bodyguard_protect: "? Вы защищаете: {target}.",
-      bum_visit: "? Вы заходите к: {target}.",
-      lawyer_protect: "? Вы защищаете: {target}.",
-      stalker_kill: "? Вы охотитесь на: {target}.",
-      result_mafia: "?? мафия",
-      result_not_mafia: "?? не мафия",
+      role_dm: ":info: Ваша роль в игре {channel}: *{role}*.",
+      failed: ":info: Не удалось обработать выбор.",
+      game_ended: ":info: Игра уже завершена.",
+      not_in_game: ":info: Вы не участвуете или выбыли.",
+      not_day: ":info: Сейчас не день.",
+      choose_alive: ":info: Нужно выбрать живого игрока.",
+      already_acted: ":info: Вы уже сделали действие в этой фазе.",
+      already_voted: ":info: Ваш голос уже зафиксирован.",
+      vote_recorded: ":info: Ваш голос учтен: {target}.",
+      vote_abstain: ":info: Вы воздержались.",
+      not_night: ":info: Сейчас не ночь.",
+      mafia_only: ":info: Команда доступна только мафии.",
+      no_mafia_target: ":info: Нельзя выбрать мафию.",
+      abstain_disabled: ":info: Воздержание отключено в этом канале.",
+      no_kill_disabled: ":info: «Без убийства» отключено в этом канале.",
+      choice_recorded: ":info: Ваш выбор: {target}.",
+      no_kill: ":info: Ваш выбор: не убивать.",
+      doctor_only: ":info: Команда доступна только доктору.",
+      detective_only: ":info: Команда доступна только детективу.",
+      bodyguard_only: ":info: Команда доступна только телохранителю.",
+      bum_only: ":info: Команда доступна только Бомжу.",
+      lawyer_only: ":info: Команда доступна только Адвокату.",
+      stalker_only: ":info: Команда доступна только Сталкеру.",
+      doctor_self_save_limit: ":info: Себя можно спасать только один раз за игру.",
+      doctor_save: ":info: Вы спасаете: {target}.",
+      detective_check: ":info: Вы проверяете: {target}.",
+      detective_kill: ":info: Вы убиваете: {target}.",
+      detective_result: ":info: Результат проверки: {target} — {result}.",
+      bodyguard_protect: ":info: Вы защищаете: {target}.",
+      bum_visit: ":info: Вы заходите к: {target}.",
+      lawyer_protect: ":info: Вы защищаете: {target}.",
+      stalker_kill: ":info: Вы охотитесь на: {target}.",
+      result_mafia: ":info: мафия",
+      result_not_mafia: ":info: не мафия",
     },
     bum: {
-      witness: "?? Вы стали свидетелем убийства: {killer} убил {victim}.",
-      nothing: "?? Сегодня вы ничего не увидели.",
+      witness: ":info: Вы стали свидетелем убийства: {killer} убил {victim}.",
+      nothing: ":info: Сегодня вы ничего не увидели.",
     },
     stalker: {
-      target_assigned: "?? Ваша цель по роли: {role}.",
-      success: "?? Контракт выполнен! Побед: {wins}. Новая цель: {role}.",
-      failed: "?? Контракт провален. Новая цель: {role}.",
-      no_targets: "?? Нет доступных ролей для цели.",
+      target_assigned: ":info: Ваша цель по роли: {role}.",
+      success: ":info: Контракт выполнен! Побед: {wins}. Новая цель: {role}.",
+      failed: ":info: Контракт провален. Новая цель: {role}.",
+      no_targets: ":info: Нет доступных ролей для цели.",
     },
     sergeant: {
-      promoted: "??? Детектив погиб. Теперь его действия доступны вам.",
-      info: "??? Результат детектива: {target} — {result}.",
+      promoted: ":info: Детектив погиб. Теперь его действия доступны вам.",
+      info: ":info: Результат детектива: {target} — {result}.",
     },
     dm_cmd: {
-      no_game: "?? Нет активной игры для этой команды.",
-      need_alive: "?? Нужно указать живого игрока.",
-      day_only: "?? Дневные действия доступны только днём.",
-      night_only: "?? Ночные действия доступны только ночью.",
-      mafia_only: "? Команда доступна только мафии.",
-      no_mafia_target: "?? Нельзя выбрать мафию.",
-      doctor_only: "? Команда доступна только доктору.",
-      detective_only: "? Команда доступна только детективу.",
-      bodyguard_only: "? Команда доступна только телохранителю.",
-      bum_only: "? Команда доступна только Бомжу.",
-      lawyer_only: "? Команда доступна только Адвокату.",
-      stalker_only: "? Команда доступна только Сталкеру.",
-      doctor_self_save_limit: "?? Себя можно спасать только один раз за игру.",
-      vote_recorded: "? Ваш голос учтен: {target}.",
-      choice_recorded: "? Ваш выбор: {target}.",
-      doctor_save: "? Вы спасаете: {target}.",
-      detective_check: "? Вы проверяете: {target}.",
-      detective_kill: "? Вы убиваете: {target}.",
-      detective_result: "?? Результат проверки: {target} — {result}.",
-      result_mafia: "?? мафия",
-      result_not_mafia: "?? не мафия",
-      bodyguard_protect: "? Вы защищаете: {target}.",
-      bum_visit: "? Вы заходите к: {target}.",
-      lawyer_protect: "? Вы защищаете: {target}.",
-      stalker_kill: "? Вы охотитесь на: {target}.",
+      no_game: ":info: Нет активной игры для этой команды.",
+      need_alive: ":info: Нужно указать живого игрока.",
+      day_only: ":info: Дневные действия доступны только днём.",
+      night_only: ":info: Ночные действия доступны только ночью.",
+      mafia_only: ":info: Команда доступна только мафии.",
+      no_mafia_target: ":info: Нельзя выбрать мафию.",
+      doctor_only: ":info: Команда доступна только доктору.",
+      detective_only: ":info: Команда доступна только детективу.",
+      bodyguard_only: ":info: Команда доступна только телохранителю.",
+      bum_only: ":info: Команда доступна только Бомжу.",
+      lawyer_only: ":info: Команда доступна только Адвокату.",
+      stalker_only: ":info: Команда доступна только Сталкеру.",
+      doctor_self_save_limit: ":info: Себя можно спасать только один раз за игру.",
+      vote_recorded: ":info: Ваш голос учтен: {target}.",
+      choice_recorded: ":info: Ваш выбор: {target}.",
+      doctor_save: ":info: Вы спасаете: {target}.",
+      detective_check: ":info: Вы проверяете: {target}.",
+      detective_kill: ":info: Вы убиваете: {target}.",
+      detective_result: ":info: Результат проверки: {target} — {result}.",
+      result_mafia: ":info: мафия",
+      result_not_mafia: ":info: не мафия",
+      bodyguard_protect: ":info: Вы защищаете: {target}.",
+      bum_visit: ":info: Вы заходите к: {target}.",
+      lawyer_protect: ":info: Вы защищаете: {target}.",
+      stalker_kill: ":info: Вы охотитесь на: {target}.",
       unknown_command:
-        "? Команда не распознана. Используйте kill/save/check/protect/visit/defend/stalk @user.",
+        ":info: Команда не распознана. Используйте kill/save/check/protect/visit/defend/stalk @user.",
     },
     test: {
-      not_dev: "? Только разработчик может использовать тест?команды.",
-      setup_usage: "?? Использование: `test setup #channel Alice,Bob,Charlie`",
-      list_usage: "?? Использование: `test list #channel`",
+      not_dev: ":info: Только разработчик может использовать тест-команды.",
+      setup_usage: ":info: Использование: `test setup #channel Alice,Bob,Charlie`",
+      list_usage: ":info: Использование: `test list #channel`",
       setup_ok:
-        "? ?? Тестовое лобби готово в {channel}. Игроки: {players}\nКоманда: `as <name> <action>`.",
-      duplicate_names: "? Повторяющиеся имена: {names}.",
-      active_game: "?? Нельзя включить тест?режим во время активной игры.",
+        ":info: :info: Тестовое лобби готово в {channel}. Игроки: {players}\nКоманда: `as <name> <action>`.",
+      duplicate_names: ":info: Повторяющиеся имена: {names}.",
+      active_game: ":info: Нельзя включить тест-режим во время активной игры.",
       real_players:
-        "?? Уберите реальных игроков из лобби перед включением тест?режима.",
-      no_game: "?? Тестовая игра не найдена. Используйте `test setup` или укажите #channel.",
-      list: "?? Тестовые игроки в {channel}: {players}",
-      as_usage: "?? Использование: `as <name> <action> [target]`",
-      actor_not_found: "? Тестовый игрок `{name}` не найден.",
-      target_not_found: "? Цель не найдена: `{name}`.",
-      roles_summary: "?? *Роли тест?игроков* в {channel}:\n{list}",
+        ":info: Уберите реальных игроков из лобби перед включением тест-режима.",
+      no_game: ":info: Тестовая игра не найдена. Используйте `test setup` или укажите #channel.",
+      list: ":info: Тестовые игроки в {channel}: {players}",
+      as_usage: ":info: Использование: `as <name> <action> [target]`",
+      actor_not_found: ":info: Тестовый игрок `{name}` не найден.",
+      target_not_found: ":info: Цель не найдена: `{name}`.",
+      roles_summary: ":info: *Роли тест-игроков* в {channel}:\n{list}",
       actions_reminder_night:
-        "?? *Тест?действия (ночь)* в {channel}:\n{list}\nКоманда: `as <name> <action> <target>`",
+        ":info: *Тест-действия (ночь)* в {channel}:\n{list}\nКоманда: `as <name> <action> <target>`",
       actions_reminder_day:
-        "?? *Тест?действия (день)* в {channel}:\n{list}\nКоманда: `as <name> vote <target>` или `as <name> abstain`",
+        ":info: *Тест-действия (день)* в {channel}:\n{list}\nКоманда: `as <name> vote <target>` или `as <name> abstain`",
     },
   },
 };
@@ -1456,8 +1456,8 @@ const FAQ_ITEMS = [
   {
     id: "auto-shorten",
     q: {
-      en: "What is Auto?shorten?",
-      ru: "Что такое авто?сокращение фаз?",
+      en: "What is Auto-shorten?",
+      ru: "Что такое авто-сокращение фаз?",
     },
     a: {
       en:
@@ -1482,7 +1482,7 @@ const FAQ_ITEMS = [
   {
     id: "no-kill",
     q: {
-      en: "What is No?kill for mafia?",
+      en: "What is No-kill for mafia?",
       ru: "Что такое «Без убийства» у мафии?",
     },
     a: {
@@ -1495,8 +1495,8 @@ const FAQ_ITEMS = [
   {
     id: "doctor-self-save",
     q: {
-      en: "Doctor self?save limit — how it works?",
-      ru: "Лимит self?save доктора — как работает?",
+      en: "Doctor self-save limit — how it works?",
+      ru: "Лимит self-save доктора — как работает?",
     },
     a: {
       en:
@@ -1572,21 +1572,68 @@ function getByPath(obj, key) {
   return key.split(".").reduce((acc, part) => (acc ? acc[part] : undefined), obj);
 }
 
-const EMOJI_FIXES = [
-  { re: /\?{4,}/g, val: "\u2728" }, // ✨
-  { re: /\?{3}/g, val: "\u2B50" }, // ⭐
-  { re: /\?{2}/g, val: "\u{1F539}" }, // 🔹
-];
+const EMOJI_MAP = {
+  // Roles
+  ":mafia:": "\u{1F52A}",
+  ":godfather:": "\u{1F3A9}",
+  ":doctor:": "\u{1FA7A}",
+  ":detective:": "\u{1F575}\uFE0F",
+  ":mayor:": "\u{1F451}",
+  ":bodyguard:": "\u{1F6E1}\uFE0F",
+  ":town:": "\u{1F465}",
+  ":jester:": "\u{1F921}",
+  ":lucky:": "\u{1F340}",
+  ":bum:": "\u{1F37A}",
+  ":sergeant:": "\u{1F396}\uFE0F",
+  ":lawyer:": "\u2696\uFE0F",
+  ":stalker:": "\u{1F3AF}",
+
+  // UI / actions
+  ":join:": "\u2795",
+  ":leave:": "\u2796",
+  ":start:": "\u25B6\uFE0F",
+  ":extend:": "\u23F1\uFE0F",
+  ":end:": "\u26D4",
+  ":ready:": "\u2705",
+  ":abstain:": "\u{1F937}",
+  ":no_kill:": "\u{1F4A4}",
+  ":help:": "\u2139\uFE0F",
+  ":prev:": "\u25C0\uFE0F",
+  ":next:": "\u25B6\uFE0F",
+  ":back:": "\u25C0\uFE0F",
+  ":check:": "\u{1F50D}",
+  ":kill:": "\u{1F5E1}\uFE0F",
+  ":vote:": "\u{1F5F3}\uFE0F",
+
+  // Status / labels
+  ":active:": "\u{1F7E2}",
+  ":recruiting:": "\u{1F7E1}",
+  ":inactive:": "\u26AB",
+  ":public:": "\u{1F310}",
+  ":private:": "\u{1F512}",
+  ":find:": "\u{1F50D}",
+  ":timer:": "\u23F3",
+  ":phase:": "\u{1F317}",
+  ":alive:": "\u2764\uFE0F",
+  ":dashboard:": "\u{1F4CC}",
+  ":warn:": "\u23F0",
+  ":maint:": "\u{1F6E0}\uFE0F",
+  ":last_words:": "\u{1F56F}\uFE0F",
+  ":graveyard:": "\u26B0\uFE0F",
+  ":info:": "\u2139\uFE0F",
+};
 
 function fixTextArtifacts(text) {
   if (text === null || text === undefined) return "";
   let out = String(text);
   // Replace encoding artifacts like "self?save" -> "self-save"
   out = out.replace(/([\p{L}\p{N}])\?([\p{L}\p{N}])/gu, "$1-$2");
-  // Replace emoji placeholders like "??"/"???"
-  for (const { re, val } of EMOJI_FIXES) {
-    out = out.replace(re, val);
+  // Replace emoji placeholders
+  for (const [token, emoji] of Object.entries(EMOJI_MAP)) {
+    out = out.split(token).join(emoji);
   }
+  // Legacy fallback if any stray question-mark placeholders remain
+  out = out.replace(/\?{2,}/g, "\u2139\uFE0F");
   return out;
 }
 
@@ -2927,7 +2974,7 @@ function buildFaqListView(lang, page = 0) {
       text: { type: "mrkdwn", text: `• ? ${item.q}` },
       accessory: {
         type: "button",
-        text: { type: "plain_text", text: "?" },
+        text: { type: "plain_text", text: ":info: " },
         action_id: ACTIONS.FAQ_TOPIC,
         value: item.id,
       },
@@ -2993,7 +3040,7 @@ function buildFaqDetailView(lang, id, page = 0) {
       },
       {
         type: "section",
-        text: { type: "mrkdwn", text: `?? ${answer}` },
+        text: { type: "mrkdwn", text: `:info: ${answer}` },
       },
       {
         type: "context",
@@ -4501,7 +4548,7 @@ function buildFaqHelpSection(lang, label, faqId) {
     text: { type: "mrkdwn", text: `*${label}*` },
     accessory: {
       type: "button",
-      text: { type: "plain_text", text: "?" },
+      text: { type: "plain_text", text: ":info: " },
       action_id: ACTIONS.FAQ_TOPIC,
       value: faqId,
     },
