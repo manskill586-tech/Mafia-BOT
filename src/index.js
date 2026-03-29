@@ -64,6 +64,10 @@ const tgUserCache = new Map();
 const tgChatCache = new Map();
 const tgHandleCache = new Map();
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function parsePlatformKey(key) {
   if (!key) return { platform: null, id: key, key };
   const raw = String(key);
@@ -11661,15 +11665,46 @@ async function startTelegram() {
       TELEGRAM_WEBHOOK_PATH.startsWith("/")
         ? TELEGRAM_WEBHOOK_PATH
         : `/${TELEGRAM_WEBHOOK_PATH}`;
-    await telegramBot.telegram.setWebhook(`${TELEGRAM_WEBHOOK_DOMAIN}${hookPath}`);
-    await telegramBot.launch({
-      webhook: { domain: TELEGRAM_WEBHOOK_DOMAIN, hookPath, port: PORT },
-    });
-  } else {
+    const webhookUrl = `${TELEGRAM_WEBHOOK_DOMAIN}${hookPath}`;
+    let attempt = 0;
+    const maxAttempts = 3;
+    while (attempt < maxAttempts) {
+      try {
+        await telegramBot.telegram.setWebhook(webhookUrl);
+        await telegramBot.launch({
+          webhook: { domain: TELEGRAM_WEBHOOK_DOMAIN, hookPath, port: PORT },
+        });
+        console.log("Telegram bot is running (webhook).");
+        return;
+      } catch (err) {
+        const retryAfter =
+          err?.response?.parameters?.retry_after ||
+          err?.parameters?.retry_after ||
+          0;
+        if (err?.response?.error_code === 429 && retryAfter >= 0) {
+          const waitMs = (Number(retryAfter) + 1) * 1000;
+          console.warn(
+            `Telegram webhook rate-limited. Retry in ${Math.ceil(
+              waitMs / 1000
+            )}s.`
+          );
+          await sleep(waitMs);
+          attempt += 1;
+          continue;
+        }
+        throw err;
+      }
+    }
+    console.warn(
+      "Telegram webhook failed after retries. Falling back to polling."
+    );
     await telegramBot.launch();
+    console.log("Telegram bot is running (polling).");
+    return;
   }
 
-  console.log("Telegram bot is running.");
+  await telegramBot.launch();
+  console.log("Telegram bot is running (polling).");
 }
 
 function restoreActiveGames() {
@@ -11731,7 +11766,11 @@ function restoreActiveGames() {
   const slackPort = useTelegramWebhook ? SLACK_PORT || 0 : PORT;
   await app.start(slackPort);
   await initBotIdentity(app.client);
-  await startTelegram();
+  try {
+    await startTelegram();
+  } catch (err) {
+    console.error("Telegram failed to start:", err?.message || err);
+  }
   restoreActiveGames();
   await maybeNotifyMaintenanceDone(app.client);
   console.log("Mafia bot is running (Socket Mode).");
