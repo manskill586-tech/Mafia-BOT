@@ -11763,7 +11763,11 @@ function restoreActiveGames() {
 
 (async () => {
   const useTelegramWebhook = Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_WEBHOOK_DOMAIN);
-  const slackPort = useTelegramWebhook ? SLACK_PORT || 0 : PORT;
+  const slackPort = useTelegramWebhook
+    ? process.env.SLACK_PORT
+      ? SLACK_PORT
+      : 3001
+    : PORT;
   await app.start(slackPort);
   await initBotIdentity(app.client);
   try {
