@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const Database = require("better-sqlite3");
 const { App, LogLevel } = require("@slack/bolt");
+const { Telegraf, Markup } = require("telegraf");
 
 const REQUIRED_ENV = [
   "SLACK_BOT_TOKEN",
@@ -34,6 +35,11 @@ const DEFAULTS = {
 };
 const DEV_USER_ID = process.env.DEV_USER_ID || "";
 const DEV_CODE = process.env.DEV_CODE || "";
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+const TELEGRAM_WEBHOOK_DOMAIN = process.env.TELEGRAM_WEBHOOK_DOMAIN || "";
+const TELEGRAM_WEBHOOK_PATH = process.env.TELEGRAM_WEBHOOK_PATH || "/telegram";
+const PORT = Number(process.env.PORT) || 3000;
+const SLACK_PORT = Number(process.env.SLACK_PORT) || 0;
 const BUTTON_PAGE_SIZE = 10;
 const BUTTONS_PER_ROW = 5;
 const FIND_PAGE_SIZE = 5;
@@ -47,9 +53,70 @@ const SPECIAL_TARGETS = {
   NO_KILL: "__no_kill__",
 };
 const TEST_ID_PREFIX = "test:";
+const PLATFORM_SLACK = "slack";
+const PLATFORM_TELEGRAM = "tg";
 
 const LANGS = ["en", "ru"];
 const DEFAULT_LANG = "en";
+
+let telegramBot = null;
+const tgUserCache = new Map();
+const tgChatCache = new Map();
+const tgHandleCache = new Map();
+
+function parsePlatformKey(key) {
+  if (!key) return { platform: null, id: key, key };
+  const raw = String(key);
+  if (raw.startsWith(TEST_ID_PREFIX)) {
+    return { platform: "test", id: raw, key: raw };
+  }
+  const match = raw.match(/^([a-z]+):(.*)$/);
+  if (match && (match[1] === PLATFORM_SLACK || match[1] === PLATFORM_TELEGRAM)) {
+    return { platform: match[1], id: match[2], key: raw };
+  }
+  return { platform: PLATFORM_SLACK, id: raw, key: raw };
+}
+
+function makeUserKey(platform, id) {
+  if (id === null || id === undefined) return id;
+  const raw = String(id);
+  if (raw.startsWith(TEST_ID_PREFIX)) return raw;
+  return `${platform}:${raw}`;
+}
+
+function makeChannelKey(platform, id) {
+  if (id === null || id === undefined) return id;
+  const raw = String(id);
+  return `${platform}:${raw}`;
+}
+
+function stripPlatformPrefix(key) {
+  return parsePlatformKey(key).id;
+}
+
+function getPlatformFromKey(key) {
+  return parsePlatformKey(key).platform;
+}
+
+function isTelegramKey(key) {
+  if (!key) return false;
+  if (getPlatformFromKey(key) === PLATFORM_TELEGRAM) return true;
+  const raw = String(key);
+  return /^-?\d+$/.test(raw);
+}
+
+function getTelegramMessageId(value) {
+  if (!value) return null;
+  const str = String(value);
+  if (!str.startsWith("tg:")) return null;
+  const id = Number(str.slice(3));
+  return Number.isFinite(id) ? id : null;
+}
+
+function setTelegramMessageId(value) {
+  if (value === null || value === undefined) return null;
+  return `tg:${value}`;
+}
 
 const I18N = {
   en: {
@@ -266,6 +333,19 @@ const I18N = {
       lang_usage: "ℹ️ Usage: `lang en` or `lang ru`.",
       lang_change_command:
         "ℹ️ Language is already set. Change it with `lang en` / `lang ru`.",
+      help_intro_tg:
+        "👋 Hi! I'm MafiaBot for Telegram.\n" +
+        "🚀 Quick start:\n" +
+        "1) Add me to a group\n" +
+        "2) In group: `/create` to open a lobby\n" +
+        "3) Players `/join`, host `/start`\n" +
+        "💬 Night/day actions arrive here as buttons",
+      help_add_tg:
+        "➕ Add me to a Telegram group. Optional: give admin rights so I can delete messages from eliminated players.",
+      help_commands_tg:
+        "📜 Group commands: `/create`, `/join`, `/leave`, `/start`, `/extend 2`, `/status`, `/config`, `/end`",
+      help_settings_tg:
+        "⚙️ Settings: use `/config` in the group, and `/mychannels` here to edit default channel settings.",
       help_intro:
         "👋 Hi! I'm MafiaBot.\n" +
         "🚀 How to start:\n" +
@@ -785,6 +865,19 @@ const I18N = {
       lang_usage: "ℹ️ Использование: `lang en` или `lang ru`.",
       lang_change_command:
         "ℹ️ Язык уже установлен. Измените его командой `lang en` / `lang ru`.",
+      help_intro_tg:
+        "👋 Привет! Я MafiaBot для Telegram.\n" +
+        "🚀 Как начать:\n" +
+        "1) Добавьте меня в группу\n" +
+        "2) В группе: `/create` чтобы открыть лобби\n" +
+        "3) Игроки `/join`, хост `/start`\n" +
+        "💬 Ночные/дневные действия приходят сюда кнопками",
+      help_add_tg:
+        "➕ Добавьте меня в Telegram‑группу. По желанию дайте админ‑права, чтобы удалять сообщения выбывших.",
+      help_commands_tg:
+        "📜 Команды в группе: `/create`, `/join`, `/leave`, `/start`, `/extend 2`, `/status`, `/config`, `/end`",
+      help_settings_tg:
+        "⚙️ Настройки: `/config` в группе и `/mychannels` в личке для дефолтных параметров.",
       help_intro:
         "👋 Привет! Я MafiaBot.\n" +
         "🚀 Как начать:\n" +
@@ -1489,7 +1582,10 @@ function getUserLang(userId) {
 }
 
 function isDevUser(userId) {
-  return Boolean(DEV_USER_ID && userId && userId === DEV_USER_ID);
+  if (!DEV_USER_ID || !userId) return false;
+  if (userId === DEV_USER_ID) return true;
+  const normalized = stripPlatformPrefix(userId);
+  return normalized === DEV_USER_ID;
 }
 
 function isDevCode(code) {
@@ -1782,6 +1878,8 @@ const ACTIONS = {
   FIND_PAGE_NEXT: "find_page_next",
   CHANNEL_LIST_PUBLIC: "channel_list_public",
   CHANNEL_LIST_PRIVATE: "channel_list_private",
+  CHANNEL_LANG_EN: "channel_lang_en",
+  CHANNEL_LANG_RU: "channel_lang_ru",
   MY_CHANNELS_OPEN: "my_channels_open",
   MY_CHANNELS_PAGE_PREV: "my_channels_page_prev",
   MY_CHANNELS_PAGE_NEXT: "my_channels_page_next",
@@ -1948,6 +2046,27 @@ function toMs(minutes) {
   return Math.max(1, minutes) * 60 * 1000;
 }
 
+function cacheTelegramUser(user) {
+  if (!user || user.is_bot) return;
+  const idKey = makeUserKey(PLATFORM_TELEGRAM, user.id);
+  const label = [user.first_name, user.last_name].filter(Boolean).join(" ") || user.username || String(user.id);
+  const handle = user.username || null;
+  const info = { label, handle };
+  tgUserCache.set(idKey, info);
+  if (handle) tgHandleCache.set(handle.toLowerCase(), idKey);
+  userCache.set(idKey, label);
+  userDisplayCache.set(idKey, info);
+}
+
+function cacheTelegramChat(chat) {
+  if (!chat) return;
+  const idKey = makeChannelKey(PLATFORM_TELEGRAM, chat.id);
+  const title = chat.title || chat.username || String(chat.id);
+  const info = { title, username: chat.username || null, type: chat.type || null };
+  tgChatCache.set(idKey, info);
+  channelInfoCache.set(idKey, { name: title, is_private: chat.type === "private" });
+}
+
 function formatDuration(lang, ms) {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
@@ -2021,6 +2140,11 @@ function normalizeTestAction(action) {
 function resolveTargetIdFromText(game, text) {
   const mentionMatch = text.match(/<@([A-Z0-9]+)>/);
   if (mentionMatch) return mentionMatch[1];
+  const tgMatch = text.match(/@([A-Za-z0-9_]+)/);
+  if (tgMatch) {
+    const key = tgHandleCache.get(tgMatch[1].toLowerCase());
+    if (key) return key;
+  }
   const name = text.trim().split(/\s+/)[0];
   if (!name) return null;
   return resolveTestPlayerIdByName(game, name);
@@ -2028,11 +2152,21 @@ function resolveTargetIdFromText(game, text) {
 
 function mention(userId) {
   if (isTestUserId(userId)) return getTestPlayerName(userId);
-  return `<@${userId}>`;
+  if (isTelegramKey(userId)) {
+    const info = tgUserCache.get(userId);
+    if (info?.handle) return `@${info.handle}`;
+    return info?.label || `tg:${stripPlatformPrefix(userId)}`;
+  }
+  return `<@${stripPlatformPrefix(userId)}>`;
 }
 
 function channelMention(channelId) {
-  return `<#${channelId}>`;
+  if (isTelegramKey(channelId)) {
+    const info = tgChatCache.get(channelId);
+    if (info?.username) return `@${info.username}`;
+    return info?.title || `tg:${stripPlatformPrefix(channelId)}`;
+  }
+  return `<#${stripPlatformPrefix(channelId)}>`;
 }
 
 function roleLabel(role, lang) {
@@ -2105,11 +2239,14 @@ function withChannelLock(channelId, fn) {
   return next;
 }
 
-function createLobby(channelId, hostId) {
+function createLobby(channelId, hostId, platform) {
   const createdAt = now();
+  const inferredPlatform =
+    platform || (isTelegramKey(channelId) ? PLATFORM_TELEGRAM : PLATFORM_SLACK);
   const game = {
     channelId,
     hostId,
+    platform: inferredPlatform,
     state: "lobby",
     round: 0,
     createdAt,
@@ -2190,6 +2327,11 @@ function normalizeGame(game) {
   if (!game.config.nightMs) game.config.nightMs = toMs(DEFAULTS.NIGHT_MINUTES);
   if (!game.config.lobbyMs) game.config.lobbyMs = toMs(DEFAULTS.LOBBY_MINUTES);
   if (!game.config.channelLang) game.config.channelLang = DEFAULT_LANG;
+  if (!game.platform) {
+    game.platform = isTelegramKey(game.channelId)
+      ? PLATFORM_TELEGRAM
+      : PLATFORM_SLACK;
+  }
   if (!game.config.extendPolicy)
     game.config.extendPolicy = DEFAULTS.EXTEND_POLICY;
   if (!Array.isArray(game.config.warningsMs))
@@ -2632,11 +2774,17 @@ async function getUserDisplayInfo(client, userId) {
   if (isTestUserId(userId)) {
     return { label: getTestPlayerName(userId), handle: null };
   }
+  if (isTelegramKey(userId)) {
+    const cached = tgUserCache.get(userId);
+    if (cached) return cached;
+    const rawId = stripPlatformPrefix(userId);
+    return { label: `tg:${rawId}`, handle: null };
+  }
   if (!userInfoEnabled) return { label: userId, handle: null };
   if (userDisplayCache.has(userId)) return userDisplayCache.get(userId);
 
   try {
-    const info = await client.users.info({ user: userId });
+    const info = await client.users.info({ user: stripPlatformPrefix(userId) });
     const profile = info.user.profile || {};
     const label =
       profile.display_name || profile.real_name || info.user.name || userId;
@@ -2654,10 +2802,20 @@ async function getUserDisplayInfo(client, userId) {
 }
 
 async function getChannelInfo(client, channelId) {
+  if (isTelegramKey(channelId)) {
+    const cached = tgChatCache.get(channelId);
+    if (cached) {
+      return { name: cached.title, is_private: cached.type === "private" };
+    }
+    const rawId = stripPlatformPrefix(channelId);
+    return { name: `tg:${rawId}`, is_private: null };
+  }
   if (!channelInfoEnabled) return { name: channelId, is_private: null };
   if (channelInfoCache.has(channelId)) return channelInfoCache.get(channelId);
   try {
-    const info = await client.conversations.info({ channel: channelId });
+    const info = await client.conversations.info({
+      channel: stripPlatformPrefix(channelId),
+    });
     const name = info.channel?.name || channelId;
     const isPrivate = Boolean(info.channel?.is_private);
     const result = { name, is_private: isPrivate };
@@ -2886,6 +3044,71 @@ function buildFaqCommandBlocks(lang, id) {
   ];
 }
 
+function buildTelegramFaqList(lang, page = 0) {
+  const items = getFaqItems(lang);
+  const totalPages = Math.max(1, Math.ceil(items.length / FAQ_PAGE_SIZE));
+  const safePage = Math.max(0, Math.min(totalPages - 1, page));
+  const start = safePage * FAQ_PAGE_SIZE;
+  const slice = items.slice(start, start + FAQ_PAGE_SIZE);
+
+  let text = `${t(lang, "faq.title")}\n${t(lang, "faq.intro")}`;
+  const rows = [];
+
+  slice.forEach((item) => {
+    text += `\n• ${item.q}`;
+    rows.push([
+      Markup.button.callback(
+        `ⓘ ${truncateButtonText(item.q, 40)}`,
+        buildTelegramCallback(ACTIONS.FAQ_TOPIC, item.id, safePage, "")
+      ),
+    ]);
+  });
+
+  if (totalPages > 1) {
+    rows.push([
+      Markup.button.callback(
+        t(lang, "button.prev"),
+        buildTelegramCallback(ACTIONS.FAQ_PAGE_PREV, "list", safePage, "")
+      ),
+      Markup.button.callback(
+        t(lang, "button.next"),
+        buildTelegramCallback(ACTIONS.FAQ_PAGE_NEXT, "list", safePage, "")
+      ),
+    ]);
+    rows.push([
+      Markup.button.callback(
+        t(lang, "button.page", { page: safePage + 1, total: totalPages }),
+        buildTelegramCallback("noop", "list", safePage, "")
+      ),
+    ]);
+  }
+
+  return { text, reply_markup: Markup.inlineKeyboard(rows).reply_markup, page: safePage };
+}
+
+function buildTelegramFaqDetail(lang, id, page = 0) {
+  const item = getFaqItemById(id, lang);
+  if (!item) {
+    return buildTelegramFaqList(lang, page);
+  }
+  const text =
+    `${t(lang, "faq.title")}\n` +
+    `\n❓ ${item.q}\n` +
+    `${item.a}\n` +
+    `${t(lang, "faq.id_label", { id: item.id })}`;
+
+  const reply_markup = Markup.inlineKeyboard([
+    [
+      Markup.button.callback(
+        t(lang, "button.back"),
+        buildTelegramCallback(ACTIONS.FAQ_BACK, "list", page, "")
+      ),
+    ],
+  ]).reply_markup;
+
+  return { text, reply_markup, page };
+}
+
 function isFaqView(view) {
   return (
     view?.callback_id === "faq_list" || view?.callback_id === "faq_detail"
@@ -2984,6 +3207,77 @@ function buildDetectiveModeBlocks(lang, channelId, text) {
   ];
 }
 
+function buildTelegramRoleHelpKeyboard(lang, role) {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback(t(lang, "button.role_help"), `tg|role_help|${role}`)],
+  ]).reply_markup;
+}
+
+function buildTelegramDetectiveModeKeyboard(lang, chatId) {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback(
+        t(lang, "button.detective_check"),
+        buildTelegramCallback(ACTIONS.DETECTIVE_MODE_CHECK, chatId)
+      ),
+      Markup.button.callback(
+        t(lang, "button.detective_kill"),
+        buildTelegramCallback(ACTIONS.DETECTIVE_MODE_KILL, chatId)
+      ),
+    ],
+  ]).reply_markup;
+}
+
+function buildTelegramLangKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback(
+        t("en", "button.lang_en"),
+        buildTelegramCallback(ACTIONS.LANG_SELECT_EN, "")
+      ),
+      Markup.button.callback(
+        t("ru", "button.lang_ru"),
+        buildTelegramCallback(ACTIONS.LANG_SELECT_RU, "")
+      ),
+    ],
+  ]).reply_markup;
+}
+
+function buildTelegramDmHelpKeyboard(lang) {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback(
+        t(lang, "button.help_add"),
+        buildTelegramCallback(ACTIONS.DM_HELP_ADD, "")
+      ),
+      Markup.button.callback(
+        t(lang, "button.help_commands"),
+        buildTelegramCallback(ACTIONS.DM_HELP_COMMANDS, "")
+      ),
+    ],
+    [
+      Markup.button.callback(
+        t(lang, "button.help_settings"),
+        buildTelegramCallback(ACTIONS.DM_HELP_SETTINGS, "")
+      ),
+      Markup.button.callback(
+        t(lang, "button.find_games"),
+        buildTelegramCallback(ACTIONS.FIND_GAMES_OPEN, "")
+      ),
+    ],
+    [
+      Markup.button.callback(
+        t(lang, "button.my_channels"),
+        buildTelegramCallback(ACTIONS.MY_CHANNELS_OPEN, "")
+      ),
+      Markup.button.callback(
+        t(lang, "button.faq"),
+        buildTelegramCallback(ACTIONS.FAQ_OPEN, "")
+      ),
+    ],
+  ]).reply_markup;
+}
+
 function buildPlayerButtonBlocks({
   channelId,
   actionId,
@@ -3067,6 +3361,95 @@ function buildPlayerButtonBlocks({
   }
 
   return blocks;
+}
+
+function buildTelegramCallback(action, chatId, page = 0, target = "") {
+  const safeTarget = target === null || target === undefined ? "" : target;
+  return `tg|${action}|${chatId}|${page}|${safeTarget}`;
+}
+
+function parseTelegramCallback(data) {
+  const parts = String(data || "").split("|");
+  if (parts.length < 2 || parts[0] !== "tg") return null;
+  return {
+    action: parts[1] || "",
+    chatId: parts[2] || "",
+    page: Number(parts[3]) || 0,
+    target: parts[4] || "",
+  };
+}
+
+function buildTelegramPlayerKeyboard({
+  chatId,
+  actionId,
+  players,
+  page = 0,
+  pageSize = BUTTON_PAGE_SIZE,
+  lang,
+  extraButtons,
+}) {
+  const safePlayers = players || [];
+  const totalPages = Math.max(1, Math.ceil(safePlayers.length / pageSize));
+  const safePage = Math.max(0, Math.min(totalPages - 1, page));
+  const start = safePage * pageSize;
+  const pagePlayers = safePlayers.slice(start, start + pageSize);
+
+  const rows = [];
+  if (extraButtons && extraButtons.length) {
+    rows.push(
+      extraButtons.map((button) =>
+        Markup.button.callback(
+          button.text,
+          buildTelegramCallback(button.actionId || actionId, chatId, safePage, button.value)
+        )
+      )
+    );
+  }
+
+  for (let i = 0; i < pagePlayers.length; i += BUTTONS_PER_ROW) {
+    const row = pagePlayers.slice(i, i + BUTTONS_PER_ROW);
+    rows.push(
+      row.map((player) =>
+        Markup.button.callback(
+          player.text,
+          buildTelegramCallback(actionId, chatId, safePage, player.id)
+        )
+      )
+    );
+  }
+
+  if (totalPages > 1) {
+    rows.push([
+      Markup.button.callback(
+        t(lang, "button.prev"),
+        buildTelegramCallback(ACTIONS.PAGE_PREV, chatId, safePage, actionId)
+      ),
+      Markup.button.callback(
+        t(lang, "button.next"),
+        buildTelegramCallback(ACTIONS.PAGE_NEXT, chatId, safePage, actionId)
+      ),
+    ]);
+    rows.push([
+      Markup.button.callback(
+        t(lang, "button.page", { page: safePage + 1, total: totalPages }),
+        buildTelegramCallback("noop", chatId, safePage, actionId)
+      ),
+    ]);
+  }
+
+  return Markup.inlineKeyboard(rows).reply_markup;
+}
+
+function isTelegramPrivateChat(ctx) {
+  return ctx?.chat?.type === "private";
+}
+
+function getTelegramUserKeyFromCtx(ctx) {
+  return makeUserKey(PLATFORM_TELEGRAM, ctx?.from?.id);
+}
+
+function getTelegramChannelKeyFromCtx(ctx) {
+  return makeChannelKey(PLATFORM_TELEGRAM, ctx?.chat?.id);
 }
 
 function getUserCurrentGame(userId) {
@@ -3241,6 +3624,72 @@ async function buildHomeViewBilingualDetailed(client, userId, primaryLang) {
   };
 }
 
+async function buildTelegramHomeText(userId, lang) {
+  const stats = getUserStats(userId);
+  const roleStats = getUserRoleStats(userId);
+  const roleLines =
+    roleStats.length > 0
+      ? roleStats
+          .map((row) => {
+            const label = roleLabel(row.role, lang);
+            const rate = computeWinRate(row);
+            return `${label}: ${row.wins}W/${row.losses}L (${rate}%)`;
+          })
+          .join("\n")
+      : t(lang, "home.role_stats_empty");
+
+  const currentGame = getUserCurrentGame(userId);
+  let currentLine = t(lang, "home.current_none");
+  if (currentGame) {
+    const remaining = currentGame.phaseDeadline
+      ? formatDuration(lang, currentGame.phaseDeadline - now())
+      : "-";
+    const status = isPlayerAlive(currentGame, userId)
+      ? t(lang, "home.status_alive")
+      : t(lang, "home.status_dead");
+    const role = currentGame.players?.[userId]?.role
+      ? roleLabel(currentGame.players[userId].role, lang)
+      : t(lang, "home.role_unknown");
+    currentLine = t(lang, "home.current_line", {
+      channel: channelMention(currentGame.channelId),
+      phase: t(lang, `state.${currentGame.state}`),
+      time: remaining,
+      alive: getAlivePlayerIds(currentGame).length,
+      status,
+      role,
+    });
+  }
+
+  let historyLines = t(lang, "home.history_empty");
+  if (currentGame?.history?.nights?.length) {
+    historyLines = currentGame.history.nights
+      .map((entry) =>
+        t(lang, "home.history_line", {
+          round: entry.round,
+          text: lang === "ru" ? entry.ru : entry.en,
+        })
+      )
+      .join("\n");
+  }
+
+  return (
+    `${t(lang, "home.title")}\n` +
+    `\n${t(lang, "home.stats_title")}\n` +
+    t(lang, "home.stats_line", {
+      games: stats.games,
+      wins: stats.wins,
+      losses: stats.losses,
+      rate: computeWinRate(stats),
+    }) +
+    `\n\n${t(lang, "home.role_stats_title")}\n` +
+    roleLines +
+    `\n\n${t(lang, "home.current_title")}\n` +
+    currentLine +
+    `\n\n${t(lang, "home.history_title")}\n` +
+    historyLines
+  );
+}
+
 async function publishHomeForUser(client, userId) {
   if (!userId) return;
   const langInfo = getUserLangInfo(userId);
@@ -3256,7 +3705,8 @@ async function publishHomeForUser(client, userId) {
 async function updateHomeForUsers(client, userIds) {
   const unique = [...new Set(userIds || [])]
     .filter(Boolean)
-    .filter((id) => !isTestUserId(id));
+    .filter((id) => !isTestUserId(id))
+    .filter((id) => !isTelegramKey(id));
   for (const userId of unique) {
     try {
       await publishHomeForUser(client, userId);
@@ -3355,6 +3805,50 @@ async function buildLobbyBlocks(client, game, lang) {
       ],
     },
   ];
+}
+
+async function buildTelegramLobbyPanel(game, lang) {
+  const playerIds = Object.keys(game.players);
+  const readyCount = Object.values(game.players).filter((p) => p.ready).length;
+  const playerList = await formatUserListPlain(null, playerIds);
+  const remaining =
+    game.phaseDeadline !== null
+      ? formatDuration(lang, game.phaseDeadline - now())
+      : "-";
+
+  const text =
+    `${t(lang, "lobby.title")}\n` +
+    `${t(lang, "lobby.host", {
+      host: await getUserLabel(null, game.hostId),
+    })}\n` +
+    `${t(lang, "lobby.players", {
+      count: playerIds.length,
+      min: game.config.minPlayers,
+    })}\n` +
+    `${t(lang, "lobby.ready", {
+      ready: readyCount,
+      total: playerIds.length,
+    })}\n` +
+    `${playerList}\n` +
+    `${t(lang, "lobby.start_in", { time: remaining })}`;
+
+  const rawChatId = stripPlatformPrefix(game.channelId);
+  const keyboard = Markup.inlineKeyboard([
+    [
+      Markup.button.callback(t(lang, "button.join"), `tg|lobby_join|${rawChatId}`),
+      Markup.button.callback(t(lang, "button.leave"), `tg|lobby_leave|${rawChatId}`),
+    ],
+    [
+      Markup.button.callback(t(lang, "button.start"), `tg|lobby_start|${rawChatId}`),
+      Markup.button.callback(t(lang, "button.ready"), `tg|lobby_ready|${rawChatId}`),
+    ],
+    [
+      Markup.button.callback(t(lang, "button.extend"), `tg|lobby_extend|${rawChatId}`),
+      Markup.button.callback(t(lang, "button.end"), `tg|lobby_end|${rawChatId}`),
+    ],
+  ]).reply_markup;
+
+  return { text, reply_markup: keyboard };
 }
 
 function buildDmHelpBlocks(lang, text) {
@@ -3510,12 +4004,14 @@ function parseFindContext(action) {
   };
 }
 
-function getFindEntries(filter, lang, langFilter) {
+function getFindEntries(filter, lang, langFilter, platform) {
   const rows = listListedChannels();
   const entries = [];
   rows.forEach((row) => {
     const channelId = row.channel_id;
-    if (row.channel_type === "group") return;
+    if (platform && getPlatformFromKey(channelId) !== platform) return;
+    if (row.channel_type === "group" && getPlatformFromKey(channelId) === PLATFORM_SLACK)
+      return;
     const settings = parseSettingsJson(row.settings_json);
     const game = getGame(channelId);
     const channelLang = game?.config?.channelLang
@@ -3563,7 +4059,7 @@ function getFindEntries(filter, lang, langFilter) {
 }
 
 function buildFindGamesBlocks(lang, filter, page, langFilter) {
-  const entries = getFindEntries(filter, lang, langFilter);
+  const entries = getFindEntries(filter, lang, langFilter, PLATFORM_SLACK);
   const totalPages = Math.max(1, Math.ceil(entries.length / FIND_PAGE_SIZE));
   const safePage = Math.min(Math.max(page, 0), totalPages - 1);
   const slice = entries.slice(
@@ -3665,6 +4161,188 @@ function buildFindGamesBlocks(lang, filter, page, langFilter) {
   }
 
   return blocks;
+}
+
+function buildTelegramFindGamesMessage(lang, filter, page, langFilter) {
+  const entries = getFindEntries(filter, lang, langFilter, PLATFORM_TELEGRAM);
+  const totalPages = Math.max(1, Math.ceil(entries.length / FIND_PAGE_SIZE));
+  const safePage = Math.min(Math.max(page, 0), totalPages - 1);
+  const slice = entries.slice(
+    safePage * FIND_PAGE_SIZE,
+    safePage * FIND_PAGE_SIZE + FIND_PAGE_SIZE
+  );
+  const listText =
+    slice.length > 0 ? slice.map((e) => e.text).join("\n") : t(lang, "find.empty");
+
+  const header = t(lang, "find.title");
+  const text = `${header}\n${listText}`;
+
+  const currentFilter = filter || "recruiting";
+  const currentLang = langFilter || "all";
+
+  const rows = [
+    [
+      Markup.button.callback(
+        t(lang, "button.filter_active"),
+        buildTelegramCallback(ACTIONS.FIND_FILTER_ACTIVE, currentFilter, safePage, currentLang)
+      ),
+      Markup.button.callback(
+        t(lang, "button.filter_recruiting"),
+        buildTelegramCallback(ACTIONS.FIND_FILTER_RECRUITING, currentFilter, safePage, currentLang)
+      ),
+      Markup.button.callback(
+        t(lang, "button.filter_inactive"),
+        buildTelegramCallback(ACTIONS.FIND_FILTER_INACTIVE, currentFilter, safePage, currentLang)
+      ),
+    ],
+    [
+      Markup.button.callback(
+        t(lang, "button.filter_lang_all"),
+        buildTelegramCallback(ACTIONS.FIND_LANG_ALL, currentFilter, safePage, currentLang)
+      ),
+      Markup.button.callback(
+        t(lang, "button.filter_lang_en"),
+        buildTelegramCallback(ACTIONS.FIND_LANG_EN, currentFilter, safePage, currentLang)
+      ),
+      Markup.button.callback(
+        t(lang, "button.filter_lang_ru"),
+        buildTelegramCallback(ACTIONS.FIND_LANG_RU, currentFilter, safePage, currentLang)
+      ),
+    ],
+  ];
+
+  if (totalPages > 1) {
+    rows.push([
+      Markup.button.callback(
+        t(lang, "button.prev"),
+        buildTelegramCallback(ACTIONS.FIND_PAGE_PREV, currentFilter, safePage, currentLang)
+      ),
+      Markup.button.callback(
+        t(lang, "button.next"),
+        buildTelegramCallback(ACTIONS.FIND_PAGE_NEXT, currentFilter, safePage, currentLang)
+      ),
+    ]);
+    rows.push([
+      Markup.button.callback(
+        t(lang, "button.page", { page: safePage + 1, total: totalPages }),
+        buildTelegramCallback("noop", currentFilter, safePage, currentLang)
+      ),
+    ]);
+  }
+
+  return { text, reply_markup: Markup.inlineKeyboard(rows).reply_markup };
+}
+
+async function buildTelegramMyChannelsMessage(userId, lang, page) {
+  const rows = listOwnedChannels(userId);
+  const totalPages = Math.max(1, Math.ceil(rows.length / MY_CHANNELS_PAGE_SIZE));
+  const safePage = Math.min(Math.max(page, 0), totalPages - 1);
+  const slice = rows.slice(
+    safePage * MY_CHANNELS_PAGE_SIZE,
+    safePage * MY_CHANNELS_PAGE_SIZE + MY_CHANNELS_PAGE_SIZE
+  );
+
+  let text = t(lang, "my_channels.title");
+  const keyboardRows = [];
+
+  if (slice.length === 0) {
+    text = `${text}\n${t(lang, "my_channels.empty")}`;
+  } else {
+    for (const row of slice) {
+      const info = await getChannelInfo(null, row.channel_id);
+      const name = info?.name ? `#${info.name}` : row.channel_id;
+      const settings = parseSettingsJson(row.settings_json);
+      const channelLang = getChannelLangFromSettings(settings);
+      const langTag = channelLang === "ru" ? "RU" : "ENG";
+      const statusKey = row.listed ? "my_channels.status_public" : "my_channels.status_private";
+      text += `\n${t(lang, statusKey)} — ${channelMention(row.channel_id)} (${langTag})`;
+      const rawId = stripPlatformPrefix(row.channel_id);
+      keyboardRows.push([
+        Markup.button.callback(
+          truncateButtonText(name),
+          buildTelegramCallback(ACTIONS.CHANNEL_EDIT_OPEN, rawId, safePage, "")
+        ),
+      ]);
+    }
+  }
+
+  if (totalPages > 1) {
+    keyboardRows.push([
+      Markup.button.callback(
+        t(lang, "button.prev"),
+        buildTelegramCallback(ACTIONS.MY_CHANNELS_PAGE_PREV, "list", safePage, "")
+      ),
+      Markup.button.callback(
+        t(lang, "button.next"),
+        buildTelegramCallback(ACTIONS.MY_CHANNELS_PAGE_NEXT, "list", safePage, "")
+      ),
+    ]);
+    keyboardRows.push([
+      Markup.button.callback(
+        t(lang, "button.page", { page: safePage + 1, total: totalPages }),
+        buildTelegramCallback("noop", "list", safePage, "")
+      ),
+    ]);
+  }
+
+  const reply_markup = keyboardRows.length
+    ? Markup.inlineKeyboard(keyboardRows).reply_markup
+    : undefined;
+
+  return { text, reply_markup };
+}
+
+function buildTelegramChannelEditMessage(channelId, lang) {
+  const pref = getChannelPref(channelId) || ensureChannelPref(channelId);
+  const settings = parseSettingsJson(pref?.settings_json);
+  const channelLang = getChannelLangFromSettings(settings);
+  const listed = Boolean(pref?.listed);
+  const privacyLabel = listed
+    ? t(lang, "settings.privacy_public")
+    : t(lang, "settings.privacy_private");
+  const langLabel =
+    channelLang === "ru"
+      ? t(lang, "settings.channel_lang_ru")
+      : t(lang, "settings.channel_lang_en");
+
+  const text =
+    `${t(lang, "my_channels.edit_intro", {
+      channel: channelMention(channelId),
+    })}\n` +
+    `${t(lang, "settings.privacy_label")}: ${privacyLabel}\n` +
+    `${t(lang, "settings.channel_lang")}: ${langLabel}`;
+
+  const rawId = stripPlatformPrefix(channelId);
+  const keyboard = Markup.inlineKeyboard([
+    [
+      Markup.button.callback(
+        t(lang, "settings.privacy_public"),
+        buildTelegramCallback(ACTIONS.CHANNEL_LIST_PUBLIC, rawId)
+      ),
+      Markup.button.callback(
+        t(lang, "settings.privacy_private"),
+        buildTelegramCallback(ACTIONS.CHANNEL_LIST_PRIVATE, rawId)
+      ),
+    ],
+    [
+      Markup.button.callback(
+        t(lang, "settings.channel_lang_en"),
+        buildTelegramCallback(ACTIONS.CHANNEL_LANG_EN, rawId)
+      ),
+      Markup.button.callback(
+        t(lang, "settings.channel_lang_ru"),
+        buildTelegramCallback(ACTIONS.CHANNEL_LANG_RU, rawId)
+      ),
+    ],
+    [
+      Markup.button.callback(
+        t(lang, "button.back"),
+        buildTelegramCallback(ACTIONS.MY_CHANNELS_OPEN, "list")
+      ),
+    ],
+  ]).reply_markup;
+
+  return { text, reply_markup: keyboard };
 }
 
 function parseMyChannelsContext(action) {
@@ -4136,6 +4814,40 @@ async function promptChannelListing(client, channelId, inviterId, channelType) {
   }
 }
 
+async function promptTelegramChannelListing(chatId, inviterId, chatType) {
+  if (!telegramBot || !chatId) return;
+  const channelKey = makeChannelKey(PLATFORM_TELEGRAM, chatId);
+  const existing = getChannelPref(channelKey);
+  if (existing?.prompted_at) return;
+
+  markChannelPrompted(channelKey, {
+    channelType: chatType || null,
+    listedBy: inviterId || null,
+  });
+
+  const channel = channelMention(channelKey);
+  const text = `${t("en", "find.prompt_public", {
+    channel,
+  })}\n${t("ru", "find.prompt_public", {
+    channel,
+  })}`;
+
+  const keyboard = Markup.inlineKeyboard([
+    [
+      Markup.button.callback(
+        t("en", "button.public"),
+        buildTelegramCallback(ACTIONS.CHANNEL_LIST_PUBLIC, chatId)
+      ),
+      Markup.button.callback(
+        t("en", "button.private"),
+        buildTelegramCallback(ACTIONS.CHANNEL_LIST_PRIVATE, chatId)
+      ),
+    ],
+  ]).reply_markup;
+
+  await telegramBot.telegram.sendMessage(chatId, text, { reply_markup: keyboard });
+}
+
 async function handleBotAddedToChannel(client, event) {
   if (!isBotJoinEvent(event)) return;
   const channelId = event.channel;
@@ -4154,7 +4866,18 @@ async function handleBotAddedToChannel(client, event) {
 }
 
 async function sendInteractiveDM(client, userId, text, blocks) {
-  const convo = await client.conversations.open({ users: userId });
+  if (isTelegramKey(userId)) {
+    if (!telegramBot) return;
+    const replyMarkup =
+      blocks?.reply_markup || blocks?.tg?.reply_markup || undefined;
+    await telegramBot.telegram.sendMessage(stripPlatformPrefix(userId), text, {
+      reply_markup: replyMarkup,
+    });
+    return;
+  }
+  const convo = await client.conversations.open({
+    users: stripPlatformPrefix(userId),
+  });
   const payload = {
     channel: convo.channel.id,
     text,
@@ -4163,9 +4886,40 @@ async function sendInteractiveDM(client, userId, text, blocks) {
   await client.chat.postMessage(payload);
 }
 
+async function editTelegramMessage(chatId, messageId, text, reply_markup) {
+  if (!telegramBot) return;
+  if (!chatId || !messageId) return;
+  try {
+    await telegramBot.telegram.editMessageText(chatId, messageId, undefined, text, {
+      reply_markup,
+    });
+  } catch (err) {
+    if (err?.response?.description?.includes("message is not modified")) return;
+    console.error("Failed to edit Telegram message:", err);
+  }
+}
+
 async function sendDevPanel(client, userId) {
   const lang = getUserLang(userId);
   const state = getMaintenanceState();
+  if (isTelegramKey(userId)) {
+    const status = state.enabled
+      ? t(lang, "dev.panel.status_on")
+      : t(lang, "dev.panel.status_off");
+    const buttonText = state.enabled
+      ? t(lang, "dev.panel.button_disable")
+      : t(lang, "dev.panel.button_enable");
+    const reply_markup = Markup.inlineKeyboard([
+      [Markup.button.callback(buttonText, buildTelegramCallback(ACTIONS.DEV_MAINT_TOGGLE, ""))],
+    ]).reply_markup;
+    await sendInteractiveDM(
+      null,
+      userId,
+      `${t(lang, "dev.panel.title")}\n${status}`,
+      { reply_markup }
+    );
+    return;
+  }
   const blocks = buildDevPanelBlocks(lang, state.enabled);
   await sendInteractiveDM(client, userId, t(lang, "dev.panel.title"), blocks);
 }
@@ -4191,6 +4945,7 @@ async function maybeNotifyMaintenanceDone(client) {
   if (!state.enabled || state.notified) return;
   if (!DEV_USER_ID) return;
   if (getActiveGames().length > 0) return;
+  if (!client && !isTelegramKey(DEV_USER_ID)) return;
 
   const lang = getUserLang(DEV_USER_ID);
   await sendInteractiveDM(client, DEV_USER_ID, t(lang, "maintenance.done"));
@@ -4205,6 +4960,7 @@ async function closeAllLobbiesForMaintenance(client) {
     await withChannelLock(lobby.channelId, async () => {
       const game = getGame(lobby.channelId);
       if (!game || game.state !== "lobby") return;
+      if (!client && !isTelegramKey(game.channelId)) return;
       await closeLobby(client, game, { key: "maintenance.lobby_closed" });
     });
   }
@@ -4280,10 +5036,32 @@ async function buildDashboardText(client, game) {
 
 async function postOrUpdateDashboard(client, game) {
   const text = await buildDashboardText(client, game);
+  if (isTelegramKey(game.channelId)) {
+    if (!telegramBot) return;
+    const chatId = stripPlatformPrefix(game.channelId);
+    const msgId = getTelegramMessageId(game.dashboardTs);
+    if (msgId) {
+      try {
+        await telegramBot.telegram.editMessageText(chatId, msgId, undefined, text);
+        return;
+      } catch (err) {
+        game.dashboardTs = null;
+      }
+    }
+    const result = await telegramBot.telegram.sendMessage(chatId, text);
+    game.dashboardTs = setTelegramMessageId(result?.message_id);
+    try {
+      await telegramBot.telegram.pinChatMessage(chatId, result.message_id);
+    } catch (err) {
+      // ignore if no rights
+    }
+    saveGame(game);
+    return;
+  }
   if (game.dashboardTs) {
     try {
       await client.chat.update({
-        channel: game.channelId,
+        channel: stripPlatformPrefix(game.channelId),
         ts: game.dashboardTs,
         text,
       });
@@ -4302,14 +5080,14 @@ async function postOrUpdateDashboard(client, game) {
   }
 
   const result = await client.chat.postMessage({
-    channel: game.channelId,
+    channel: stripPlatformPrefix(game.channelId),
     text,
   });
   game.dashboardTs = result?.ts || null;
   if (game.dashboardTs) {
     try {
       await client.pins.add({
-        channel: game.channelId,
+        channel: stripPlatformPrefix(game.channelId),
         timestamp: game.dashboardTs,
       });
     } catch (err) {
@@ -4322,9 +5100,23 @@ async function postOrUpdateDashboard(client, game) {
 async function finalizeDashboard(client, game) {
   if (!game.dashboardTs) return;
   await postOrUpdateDashboard(client, game);
+  if (isTelegramKey(game.channelId)) {
+    const chatId = stripPlatformPrefix(game.channelId);
+    const msgId = getTelegramMessageId(game.dashboardTs);
+    if (telegramBot && msgId) {
+      try {
+        await telegramBot.telegram.unpinChatMessage(chatId, msgId);
+      } catch (err) {
+        // ignore
+      }
+    }
+    game.dashboardTs = null;
+    saveGame(game);
+    return;
+  }
   try {
     await client.pins.remove({
-      channel: game.channelId,
+      channel: stripPlatformPrefix(game.channelId),
       timestamp: game.dashboardTs,
     });
   } catch (err) {
@@ -4374,6 +5166,7 @@ async function requestLastWords(client, game, userId) {
 }
 
 async function ensureGraveyardChannel(client, game) {
+  if (isTelegramKey(game.channelId)) return null;
   if (game.graveyard?.id) return game.graveyard.id;
 
   const suffix = game.channelId.slice(-4).toLowerCase();
@@ -4401,6 +5194,7 @@ async function ensureGraveyardChannel(client, game) {
 
 async function inviteToGraveyard(client, game, userId) {
   if (isTestUserId(userId)) return true;
+  if (isTelegramKey(game.channelId)) return true;
   const channelId = await ensureGraveyardChannel(client, game);
   if (!channelId) return false;
   try {
@@ -4416,6 +5210,7 @@ async function inviteToGraveyard(client, game, userId) {
 }
 
 async function ensureMafiaRoom(client, game) {
+  if (isTelegramKey(game.channelId)) return null;
   if (game.mafiaRoomId) return game.mafiaRoomId;
   const realMafiaIds = game.roles.mafiaIds.filter((id) => !isTestUserId(id));
   if (realMafiaIds.length < 2) return null;
@@ -4441,7 +5236,12 @@ async function ensureMafiaRoom(client, game) {
 }
 
 async function announceToChannel(client, channelId, text) {
-  await client.chat.postMessage({ channel: channelId, text });
+  if (isTelegramKey(channelId)) {
+    if (!telegramBot) return;
+    await telegramBot.telegram.sendMessage(stripPlatformPrefix(channelId), text);
+    return;
+  }
+  await client.chat.postMessage({ channel: stripPlatformPrefix(channelId), text });
 }
 
 async function announceToChannelLocalized(
@@ -4461,7 +5261,19 @@ async function announceToChannelLocalized(
 
 async function notifyEphemeral(client, channelId, userId, text) {
   try {
-    await client.chat.postEphemeral({ channel: channelId, user: userId, text });
+    if (isTelegramKey(channelId) || isTelegramKey(userId)) {
+      if (!telegramBot) return;
+      const target = isTelegramKey(userId)
+        ? stripPlatformPrefix(userId)
+        : stripPlatformPrefix(channelId);
+      await telegramBot.telegram.sendMessage(target, text);
+      return;
+    }
+    await client.chat.postEphemeral({
+      channel: stripPlatformPrefix(channelId),
+      user: stripPlatformPrefix(userId),
+      text,
+    });
   } catch (err) {
     console.error("Failed to send ephemeral message:", err);
   }
@@ -4474,6 +5286,29 @@ async function notifyEphemeralLocalized(client, channelId, userId, key, params) 
 
 async function postOrUpdateLobbyPanel(client, game) {
   if (game.state !== "lobby") return;
+  if (isTelegramKey(game.channelId)) {
+    if (!telegramBot) return;
+    const lang = getChannelLangForGame(game);
+    const { text, reply_markup } = await buildTelegramLobbyPanel(game, lang);
+    const chatId = stripPlatformPrefix(game.channelId);
+    const msgId = getTelegramMessageId(game.lobbyMessageTs);
+    if (msgId) {
+      try {
+        await telegramBot.telegram.editMessageText(chatId, msgId, undefined, text, {
+          reply_markup,
+        });
+        return;
+      } catch (err) {
+        game.lobbyMessageTs = null;
+      }
+    }
+    const res = await telegramBot.telegram.sendMessage(chatId, text, {
+      reply_markup,
+    });
+    game.lobbyMessageTs = setTelegramMessageId(res?.message_id);
+    saveGame(game);
+    return;
+  }
   const playerCount = Object.keys(game.players).length;
   const minPlayers = game.config.minPlayers;
   const lang = getChannelLangForGame(game);
@@ -4487,7 +5322,7 @@ async function postOrUpdateLobbyPanel(client, game) {
   if (ts) {
     try {
       await client.chat.update({
-        channel: game.channelId,
+        channel: stripPlatformPrefix(game.channelId),
         ts,
         text,
         blocks,
@@ -4506,7 +5341,7 @@ async function postOrUpdateLobbyPanel(client, game) {
   }
 
   const res = await client.chat.postMessage({
-    channel: game.channelId,
+    channel: stripPlatformPrefix(game.channelId),
     text,
     blocks,
   });
@@ -4521,9 +5356,29 @@ async function finalizeLobbyPanel(client, game, text) {
     typeof text === "string"
       ? text
       : text?.[lang] || text?.en || text?.ru || "-";
+  if (isTelegramKey(game.channelId)) {
+    if (telegramBot) {
+      const chatId = stripPlatformPrefix(game.channelId);
+      const msgId = getTelegramMessageId(ts);
+      if (msgId) {
+        try {
+          await telegramBot.telegram.editMessageText(
+            chatId,
+            msgId,
+            undefined,
+            localizedText
+          );
+        } catch (err) {
+          console.error("Failed to finalize lobby panel:", err);
+        }
+      }
+    }
+    game.lobbyMessageTs = null;
+    return;
+  }
   try {
     await client.chat.update({
-      channel: game.channelId,
+      channel: stripPlatformPrefix(game.channelId),
       ts,
       text: localizedText,
       blocks: [
@@ -4626,13 +5481,20 @@ async function sendPhaseWarning(client, game, warnMs) {
 async function sendReminder(client, userId, channelId, actionKey) {
   if (isTestUserId(userId)) return;
   const lang = getUserLang(userId);
-  const convo = await client.conversations.open({ users: userId });
+  const text = t(lang, "reminder.text", {
+    action: t(lang, `reminder.${actionKey}`),
+    channel: channelMention(channelId),
+  });
+  if (isTelegramKey(userId)) {
+    await sendInteractiveDM(client, userId, text);
+    return;
+  }
+  const convo = await client.conversations.open({
+    users: stripPlatformPrefix(userId),
+  });
   await client.chat.postMessage({
     channel: convo.channel.id,
-    text: t(lang, "reminder.text", {
-      action: t(lang, `reminder.${actionKey}`),
-      channel: channelMention(channelId),
-    }),
+    text,
   });
 }
 
@@ -5309,6 +6171,10 @@ async function autoResolvePhase(client, game) {
 }
 
 async function sendNightPrompts(client, game) {
+  if (isTelegramKey(game.channelId)) {
+    await sendNightPromptsTelegram(game);
+    return;
+  }
   const mafiaTargets = listAliveNonMafiaIds(game);
   const aliveIds = getAlivePlayerIds(game);
 
@@ -5474,7 +6340,172 @@ async function sendNightPrompts(client, game) {
   }
 }
 
+async function sendNightPromptsTelegram(game) {
+  if (!telegramBot) return;
+  const rawChatId = stripPlatformPrefix(game.channelId);
+  const mafiaTargets = listAliveNonMafiaIds(game);
+  const aliveIds = getAlivePlayerIds(game);
+
+  const mafiaChoices = await buildUserChoices(null, mafiaTargets);
+  const aliveChoices = await buildUserChoices(null, aliveIds);
+
+  for (const mafiaId of game.roles.mafiaIds) {
+    if (!isPlayerAlive(game, mafiaId)) continue;
+    if (isTestUserId(mafiaId)) continue;
+    if (!mafiaChoices.length) continue;
+    const lang = getUserLang(mafiaId);
+    const promptText = t(lang, "prompt.mafia", {
+      channel: channelMention(game.channelId),
+    });
+    const extraButtons = [];
+    if (game.config.allowNoKill) {
+      extraButtons.push({
+        text: t(lang, "button.no_kill"),
+        value: SPECIAL_TARGETS.NO_KILL,
+        actionId: ACTIONS.MAFIA_VOTE,
+      });
+    }
+    const reply_markup = buildTelegramPlayerKeyboard({
+      chatId: rawChatId,
+      actionId: ACTIONS.MAFIA_VOTE,
+      players: mafiaChoices,
+      page: 0,
+      pageSize: BUTTON_PAGE_SIZE,
+      lang,
+      extraButtons,
+    });
+    await sendInteractiveDM(null, mafiaId, promptText, { reply_markup });
+  }
+
+  if (game.roles.doctorId && isPlayerAlive(game, game.roles.doctorId)) {
+    if (!isTestUserId(game.roles.doctorId)) {
+      const lang = getUserLang(game.roles.doctorId);
+      const promptText = t(lang, "prompt.doctor", {
+        channel: channelMention(game.channelId),
+      });
+      const reply_markup = buildTelegramPlayerKeyboard({
+        chatId: rawChatId,
+        actionId: ACTIONS.DOCTOR_SAVE,
+        players: aliveChoices,
+        page: 0,
+        pageSize: BUTTON_PAGE_SIZE,
+        lang,
+      });
+      await sendInteractiveDM(null, game.roles.doctorId, promptText, {
+        reply_markup,
+      });
+    }
+  }
+
+  if (game.roles.detectiveId && isPlayerAlive(game, game.roles.detectiveId)) {
+    if (!isTestUserId(game.roles.detectiveId)) {
+      const lang = getUserLang(game.roles.detectiveId);
+      const promptText = t(lang, "prompt.detective_mode", {
+        channel: channelMention(game.channelId),
+      });
+      const reply_markup = buildTelegramDetectiveModeKeyboard(lang, rawChatId);
+      await sendInteractiveDM(null, game.roles.detectiveId, promptText, {
+        reply_markup,
+      });
+    }
+  }
+
+  if (game.roles.bodyguardId && isPlayerAlive(game, game.roles.bodyguardId)) {
+    if (!isTestUserId(game.roles.bodyguardId)) {
+      const lang = getUserLang(game.roles.bodyguardId);
+      const promptText = t(lang, "prompt.bodyguard", {
+        channel: channelMention(game.channelId),
+      });
+      const reply_markup = buildTelegramPlayerKeyboard({
+        chatId: rawChatId,
+        actionId: ACTIONS.BODYGUARD_PROTECT,
+        players: aliveChoices,
+        page: 0,
+        pageSize: BUTTON_PAGE_SIZE,
+        lang,
+      });
+      await sendInteractiveDM(null, game.roles.bodyguardId, promptText, {
+        reply_markup,
+      });
+    }
+  }
+
+  if (game.roles.bumId && isPlayerAlive(game, game.roles.bumId)) {
+    if (!isTestUserId(game.roles.bumId)) {
+      const lang = getUserLang(game.roles.bumId);
+      const promptText = t(lang, "prompt.bum", {
+        channel: channelMention(game.channelId),
+      });
+      const reply_markup = buildTelegramPlayerKeyboard({
+        chatId: rawChatId,
+        actionId: ACTIONS.BUM_VISIT,
+        players: aliveChoices,
+        page: 0,
+        pageSize: BUTTON_PAGE_SIZE,
+        lang,
+      });
+      await sendInteractiveDM(null, game.roles.bumId, promptText, {
+        reply_markup,
+      });
+    }
+  }
+
+  if (game.roles.lawyerId && isPlayerAlive(game, game.roles.lawyerId)) {
+    if (!isTestUserId(game.roles.lawyerId)) {
+      const lang = getUserLang(game.roles.lawyerId);
+      const promptText = t(lang, "prompt.lawyer", {
+        channel: channelMention(game.channelId),
+      });
+      const reply_markup = buildTelegramPlayerKeyboard({
+        chatId: rawChatId,
+        actionId: ACTIONS.LAWYER_PROTECT,
+        players: aliveChoices,
+        page: 0,
+        pageSize: BUTTON_PAGE_SIZE,
+        lang,
+      });
+      await sendInteractiveDM(null, game.roles.lawyerId, promptText, {
+        reply_markup,
+      });
+    }
+  }
+
+  if (game.roles.stalkerId && isPlayerAlive(game, game.roles.stalkerId)) {
+    if (!isTestUserId(game.roles.stalkerId)) {
+      const lang = getUserLang(game.roles.stalkerId);
+      const targetRole = game.stalker?.targetRole;
+      const roleText = targetRole
+        ? roleLabel(targetRole, lang)
+        : t(lang, "home.role_unknown");
+      const promptText = t(lang, "prompt.stalker", {
+        channel: channelMention(game.channelId),
+        role: roleText,
+      });
+      const stalkerTargets = aliveIds.filter(
+        (id) => id !== game.roles.stalkerId
+      );
+      const stalkerChoices = await buildUserChoices(null, stalkerTargets);
+      if (!stalkerChoices.length) return;
+      const reply_markup = buildTelegramPlayerKeyboard({
+        chatId: rawChatId,
+        actionId: ACTIONS.STALKER_KILL,
+        players: stalkerChoices,
+        page: 0,
+        pageSize: BUTTON_PAGE_SIZE,
+        lang,
+      });
+      await sendInteractiveDM(null, game.roles.stalkerId, promptText, {
+        reply_markup,
+      });
+    }
+  }
+}
+
 async function sendDayPrompts(client, game) {
+  if (isTelegramKey(game.channelId)) {
+    await sendDayPromptsTelegram(game);
+    return;
+  }
   const aliveIds = getAlivePlayerIds(game);
   const choices = await buildUserChoices(client, aliveIds);
 
@@ -5504,6 +6535,39 @@ async function sendDayPrompts(client, game) {
     });
 
     await sendInteractiveDM(client, userId, promptText, blocks);
+  }
+}
+
+async function sendDayPromptsTelegram(game) {
+  if (!telegramBot) return;
+  const rawChatId = stripPlatformPrefix(game.channelId);
+  const aliveIds = getAlivePlayerIds(game);
+  const choices = await buildUserChoices(null, aliveIds);
+
+  for (const userId of aliveIds) {
+    if (isTestUserId(userId)) continue;
+    const lang = getUserLang(userId);
+    const promptText = t(lang, "prompt.day", {
+      channel: channelMention(game.channelId),
+    });
+    const extraButtons = [];
+    if (game.config.allowAbstain) {
+      extraButtons.push({
+        text: t(lang, "button.abstain"),
+        value: SPECIAL_TARGETS.ABSTAIN,
+        actionId: ACTIONS.DAY_VOTE,
+      });
+    }
+    const reply_markup = buildTelegramPlayerKeyboard({
+      chatId: rawChatId,
+      actionId: ACTIONS.DAY_VOTE,
+      players: choices,
+      page: 0,
+      pageSize: BUTTON_PAGE_SIZE,
+      lang,
+      extraButtons,
+    });
+    await sendInteractiveDM(null, userId, promptText, { reply_markup });
   }
 }
 
@@ -6061,6 +7125,11 @@ async function sendRoleDM(client, game, userId, role) {
     channel: channelMention(game.channelId),
     role: roleLabel(role, lang),
   });
+  if (isTelegramKey(userId)) {
+    const replyMarkup = buildTelegramRoleHelpKeyboard(lang, role);
+    await sendInteractiveDM(client, userId, text, { reply_markup: replyMarkup });
+    return;
+  }
   const blocks = [
     {
       type: "section",
@@ -8853,6 +9922,1756 @@ app.event("message", async ({ event, client }) => {
   });
 });
 
+async function replyToTelegramMessage(ctx, text, reply_markup) {
+  const chatId = ctx?.chat?.id || ctx?.callbackQuery?.message?.chat?.id;
+  if (!telegramBot || !chatId) return;
+  const payload = {};
+  if (reply_markup) payload.reply_markup = reply_markup;
+  if (ctx.message?.message_id) payload.reply_to_message_id = ctx.message.message_id;
+  await telegramBot.telegram.sendMessage(chatId, text, payload);
+}
+
+async function answerTelegramCallback(ctx, text, showAlert = false) {
+  try {
+    if (!text) {
+      await ctx.answerCbQuery();
+      return;
+    }
+    await ctx.answerCbQuery(text, { show_alert: showAlert });
+  } catch (err) {
+    console.error("Failed to answer Telegram callback:", err);
+  }
+}
+
+async function updateTelegramActionMessage(ctx, text, reply_markup) {
+  const message = ctx?.callbackQuery?.message;
+  if (!message) return;
+  await editTelegramMessage(message.chat.id, message.message_id, text, reply_markup);
+}
+
+async function handleTelegramDetectiveMode(ctx, data) {
+  const rawChatId = data.chatId;
+  const channelId = makeChannelKey(PLATFORM_TELEGRAM, rawChatId);
+  const actorId = getTelegramUserKeyFromCtx(ctx);
+  const actorLang = getUserLang(actorId);
+
+  if (!rawChatId) {
+    await answerTelegramCallback(ctx, t(actorLang, "action.failed"), true);
+    return;
+  }
+
+  await withChannelLock(channelId, async () => {
+    const game = getGame(channelId);
+    if (!game) {
+      await answerTelegramCallback(ctx, t(actorLang, "action.game_ended"), true);
+      return;
+    }
+    if (!isPlayerAlive(game, actorId)) {
+      await answerTelegramCallback(ctx, t(actorLang, "action.not_in_game"), true);
+      return;
+    }
+    if (game.state !== "night") {
+      await answerTelegramCallback(ctx, t(actorLang, "action.not_night"), true);
+      return;
+    }
+    if (game.roles.detectiveId !== actorId) {
+      await answerTelegramCallback(ctx, t(actorLang, "action.detective_only"), true);
+      return;
+    }
+    if (game.night.detectiveCheck || game.night.detectiveKill) {
+      await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+      return;
+    }
+
+    const nextAction =
+      data.action === ACTIONS.DETECTIVE_MODE_KILL
+        ? ACTIONS.DETECTIVE_KILL
+        : ACTIONS.DETECTIVE_CHECK;
+    const targetIds = getTargetsForAction(game, nextAction, actorId);
+    if (!targetIds.length) {
+      await answerTelegramCallback(ctx, t(actorLang, "action.failed"), true);
+      return;
+    }
+    const choices = await buildUserChoices(null, targetIds);
+    const text = getPromptTextForAction(actorLang, game, nextAction);
+    const reply_markup = buildTelegramPlayerKeyboard({
+      chatId: rawChatId,
+      actionId: nextAction,
+      players: choices,
+      page: 0,
+      pageSize: BUTTON_PAGE_SIZE,
+      lang: actorLang,
+    });
+    await updateTelegramActionMessage(ctx, text, reply_markup);
+    await answerTelegramCallback(ctx);
+  });
+}
+
+async function handleTelegramPageAction(ctx, data) {
+  const rawChatId = data.chatId;
+  const actionType = data.target;
+  const channelId = makeChannelKey(PLATFORM_TELEGRAM, rawChatId);
+  const actorId = getTelegramUserKeyFromCtx(ctx);
+  const actorLang = getUserLang(actorId);
+
+  if (!rawChatId || !actionType) {
+    await answerTelegramCallback(ctx, t(actorLang, "action.failed"), true);
+    return;
+  }
+
+  await withChannelLock(channelId, async () => {
+    const game = getGame(channelId);
+    if (!game) {
+      await answerTelegramCallback(ctx, t(actorLang, "action.game_ended"), true);
+      return;
+    }
+    if (!isPlayerAlive(game, actorId)) {
+      await answerTelegramCallback(ctx, t(actorLang, "action.not_in_game"), true);
+      return;
+    }
+
+    if (actionType === ACTIONS.DAY_VOTE) {
+      if (game.state !== "day") {
+        await answerTelegramCallback(ctx, t(actorLang, "action.not_day"), true);
+        return;
+      }
+      if (game.day.votes[actorId]) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_voted"), true);
+        return;
+      }
+    } else {
+      if (game.state !== "night") {
+        await answerTelegramCallback(ctx, t(actorLang, "action.not_night"), true);
+        return;
+      }
+      if (actionType === ACTIONS.MAFIA_VOTE && !isMafia(game, actorId)) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.mafia_only"), true);
+        return;
+      }
+      if (actionType === ACTIONS.DOCTOR_SAVE && game.roles.doctorId !== actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.doctor_only"), true);
+        return;
+      }
+      if (
+        (actionType === ACTIONS.DETECTIVE_CHECK ||
+          actionType === ACTIONS.DETECTIVE_KILL) &&
+        game.roles.detectiveId !== actorId
+      ) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.detective_only"), true);
+        return;
+      }
+      if (actionType === ACTIONS.BODYGUARD_PROTECT && game.roles.bodyguardId !== actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.bodyguard_only"), true);
+        return;
+      }
+      if (actionType === ACTIONS.BUM_VISIT && game.roles.bumId !== actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.bum_only"), true);
+        return;
+      }
+      if (actionType === ACTIONS.LAWYER_PROTECT && game.roles.lawyerId !== actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.lawyer_only"), true);
+        return;
+      }
+      if (actionType === ACTIONS.STALKER_KILL && game.roles.stalkerId !== actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.stalker_only"), true);
+        return;
+      }
+
+      if (actionType === ACTIONS.MAFIA_VOTE && game.night.mafiaVotes[actorId]) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (actionType === ACTIONS.DOCTOR_SAVE && game.night.doctorSave) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (
+        (actionType === ACTIONS.DETECTIVE_CHECK ||
+          actionType === ACTIONS.DETECTIVE_KILL) &&
+        (game.night.detectiveCheck || game.night.detectiveKill)
+      ) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (actionType === ACTIONS.BODYGUARD_PROTECT && game.night.bodyguardProtect) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (actionType === ACTIONS.BUM_VISIT && game.night.bumVisit) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (actionType === ACTIONS.LAWYER_PROTECT && game.night.lawyerProtect) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (actionType === ACTIONS.STALKER_KILL && game.night.stalkerKill) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+    }
+
+    const targetIds = getTargetsForAction(game, actionType, actorId);
+    if (!targetIds.length) {
+      await answerTelegramCallback(ctx, t(actorLang, "action.failed"), true);
+      return;
+    }
+    const choices = await buildUserChoices(null, targetIds);
+    const totalPages = Math.max(1, Math.ceil(choices.length / BUTTON_PAGE_SIZE));
+    const direction = data.action === ACTIONS.PAGE_NEXT ? 1 : -1;
+    const newPage = Math.max(0, Math.min(totalPages - 1, data.page + direction));
+    const text = getPromptTextForAction(actorLang, game, actionType);
+    const extraButtons = [];
+    if (actionType === ACTIONS.DAY_VOTE && game.config.allowAbstain) {
+      extraButtons.push({
+        text: t(actorLang, "button.abstain"),
+        value: SPECIAL_TARGETS.ABSTAIN,
+        actionId: ACTIONS.DAY_VOTE,
+      });
+    }
+    if (actionType === ACTIONS.MAFIA_VOTE && game.config.allowNoKill) {
+      extraButtons.push({
+        text: t(actorLang, "button.no_kill"),
+        value: SPECIAL_TARGETS.NO_KILL,
+        actionId: ACTIONS.MAFIA_VOTE,
+      });
+    }
+    const reply_markup = buildTelegramPlayerKeyboard({
+      chatId: rawChatId,
+      actionId: actionType,
+      players: choices,
+      page: newPage,
+      pageSize: BUTTON_PAGE_SIZE,
+      lang: actorLang,
+      extraButtons,
+    });
+    await updateTelegramActionMessage(ctx, text, reply_markup);
+    await answerTelegramCallback(ctx);
+  });
+}
+
+async function handleTelegramPlayerAction(ctx, data) {
+  const rawChatId = data.chatId;
+  const channelId = makeChannelKey(PLATFORM_TELEGRAM, rawChatId);
+  const actorId = getTelegramUserKeyFromCtx(ctx);
+  const actorLang = getUserLang(actorId);
+  const targetId = data.target;
+
+  if (!rawChatId || !targetId) {
+    await answerTelegramCallback(ctx, t(actorLang, "action.failed"), true);
+    return;
+  }
+
+  await withChannelLock(channelId, async () => {
+    const game = getGame(channelId);
+    if (!game) {
+      await answerTelegramCallback(ctx, t(actorLang, "action.game_ended"), true);
+      return;
+    }
+    if (!isPlayerAlive(game, actorId)) {
+      await answerTelegramCallback(ctx, t(actorLang, "action.not_in_game"), true);
+      return;
+    }
+
+    if (data.action === ACTIONS.DAY_VOTE) {
+      if (game.state !== "day") {
+        await answerTelegramCallback(ctx, t(actorLang, "action.not_day"), true);
+        return;
+      }
+      if (game.day.votes[actorId]) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_voted"), true);
+        return;
+      }
+      if (targetId === SPECIAL_TARGETS.ABSTAIN && !game.config.allowAbstain) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.abstain_disabled"), true);
+        return;
+      }
+      if (targetId !== SPECIAL_TARGETS.ABSTAIN && !isPlayerAlive(game, targetId)) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.choose_alive"), true);
+        return;
+      }
+      game.day.votes[actorId] = targetId;
+      saveGame(game);
+      const text =
+        targetId === SPECIAL_TARGETS.ABSTAIN
+          ? t(actorLang, "action.vote_abstain")
+          : t(actorLang, "action.vote_recorded", { target: mention(targetId) });
+      await updateTelegramActionMessage(ctx, text, undefined);
+
+      if (maybeShortenPhase(game, "day")) {
+        await announceToChannelLocalized(null, game, "warn.shortened_day");
+        await postOrUpdateDashboard(null, game);
+        saveGame(game);
+      }
+
+      if (dayReady(game)) {
+        clearPhaseTimers(channelId);
+        await resolveDay(null, game, false);
+      }
+      await answerTelegramCallback(ctx);
+      return;
+    }
+
+    if (game.state !== "night") {
+      await answerTelegramCallback(ctx, t(actorLang, "action.not_night"), true);
+      return;
+    }
+
+    if (data.action === ACTIONS.MAFIA_VOTE) {
+      if (!isMafia(game, actorId)) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.mafia_only"), true);
+        return;
+      }
+      if (game.night.mafiaVotes[actorId]) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (targetId === SPECIAL_TARGETS.NO_KILL && !game.config.allowNoKill) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.no_kill_disabled"), true);
+        return;
+      }
+      if (targetId !== SPECIAL_TARGETS.NO_KILL) {
+        if (!isPlayerAlive(game, targetId)) {
+          await answerTelegramCallback(ctx, t(actorLang, "action.choose_alive"), true);
+          return;
+        }
+        if (isMafia(game, targetId)) {
+          await answerTelegramCallback(ctx, t(actorLang, "action.no_mafia_target"), true);
+          return;
+        }
+      }
+      game.night.mafiaVotes[actorId] = targetId;
+      saveGame(game);
+      const text =
+        targetId === SPECIAL_TARGETS.NO_KILL
+          ? t(actorLang, "action.no_kill")
+          : t(actorLang, "action.choice_recorded", { target: mention(targetId) });
+      await updateTelegramActionMessage(ctx, text, undefined);
+    }
+
+    if (data.action === ACTIONS.DOCTOR_SAVE) {
+      if (game.roles.doctorId !== actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.doctor_only"), true);
+        return;
+      }
+      if (game.night.doctorSave) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (!isPlayerAlive(game, targetId)) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.choose_alive"), true);
+        return;
+      }
+      if (
+        targetId === actorId &&
+        game.doctorSelfSavesUsed >= game.config.doctorSelfSaveLimit
+      ) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.doctor_self_save_limit"), true);
+        return;
+      }
+      game.night.doctorSave = targetId;
+      if (targetId === actorId) game.doctorSelfSavesUsed += 1;
+      saveGame(game);
+      await updateTelegramActionMessage(
+        ctx,
+        t(actorLang, "action.doctor_save", { target: mention(targetId) }),
+        undefined
+      );
+    }
+
+    if (data.action === ACTIONS.DETECTIVE_CHECK) {
+      if (game.roles.detectiveId !== actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.detective_only"), true);
+        return;
+      }
+      if (game.night.detectiveCheck || game.night.detectiveKill) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (!isPlayerAlive(game, targetId)) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.choose_alive"), true);
+        return;
+      }
+      game.night.detectiveCheck = targetId;
+      saveGame(game);
+      await updateTelegramActionMessage(
+        ctx,
+        t(actorLang, "action.detective_check", { target: mention(targetId) }),
+        undefined
+      );
+
+      const result = isDetectiveSeesMafia(game, targetId)
+        ? t(actorLang, "action.result_mafia")
+        : t(actorLang, "action.result_not_mafia");
+      await sendInteractiveDM(null, actorId, t(actorLang, "action.detective_result", {
+        target: mention(targetId),
+        result,
+      }));
+
+      const sergeantId = game.roles.sergeantId;
+      if (
+        sergeantId &&
+        sergeantId !== actorId &&
+        isPlayerAlive(game, sergeantId) &&
+        !isTestUserId(sergeantId)
+      ) {
+        const serLang = getUserLang(sergeantId);
+        const serResult = isDetectiveSeesMafia(game, targetId)
+          ? t(serLang, "action.result_mafia")
+          : t(serLang, "action.result_not_mafia");
+        await sendInteractiveDM(null, sergeantId, t(serLang, "sergeant.info", {
+          target: mention(targetId),
+          result: serResult,
+        }));
+      }
+    }
+
+    if (data.action === ACTIONS.DETECTIVE_KILL) {
+      if (game.roles.detectiveId !== actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.detective_only"), true);
+        return;
+      }
+      if (game.night.detectiveCheck || game.night.detectiveKill) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (!isPlayerAlive(game, targetId) || targetId === actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.choose_alive"), true);
+        return;
+      }
+      game.night.detectiveKill = targetId;
+      saveGame(game);
+      await updateTelegramActionMessage(
+        ctx,
+        t(actorLang, "action.detective_kill", { target: mention(targetId) }),
+        undefined
+      );
+    }
+
+    if (data.action === ACTIONS.BODYGUARD_PROTECT) {
+      if (game.roles.bodyguardId !== actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.bodyguard_only"), true);
+        return;
+      }
+      if (game.night.bodyguardProtect) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (!isPlayerAlive(game, targetId)) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.choose_alive"), true);
+        return;
+      }
+      game.night.bodyguardProtect = targetId;
+      saveGame(game);
+      await updateTelegramActionMessage(
+        ctx,
+        t(actorLang, "action.bodyguard_protect", { target: mention(targetId) }),
+        undefined
+      );
+    }
+
+    if (data.action === ACTIONS.BUM_VISIT) {
+      if (game.roles.bumId !== actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.bum_only"), true);
+        return;
+      }
+      if (game.night.bumVisit) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (!isPlayerAlive(game, targetId)) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.choose_alive"), true);
+        return;
+      }
+      game.night.bumVisit = targetId;
+      saveGame(game);
+      await updateTelegramActionMessage(
+        ctx,
+        t(actorLang, "action.bum_visit", { target: mention(targetId) }),
+        undefined
+      );
+    }
+
+    if (data.action === ACTIONS.LAWYER_PROTECT) {
+      if (game.roles.lawyerId !== actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.lawyer_only"), true);
+        return;
+      }
+      if (game.night.lawyerProtect) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (!isPlayerAlive(game, targetId)) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.choose_alive"), true);
+        return;
+      }
+      game.night.lawyerProtect = targetId;
+      saveGame(game);
+      await updateTelegramActionMessage(
+        ctx,
+        t(actorLang, "action.lawyer_protect", { target: mention(targetId) }),
+        undefined
+      );
+    }
+
+    if (data.action === ACTIONS.STALKER_KILL) {
+      if (game.roles.stalkerId !== actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.stalker_only"), true);
+        return;
+      }
+      if (game.night.stalkerKill) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.already_acted"), true);
+        return;
+      }
+      if (!isPlayerAlive(game, targetId) || targetId === actorId) {
+        await answerTelegramCallback(ctx, t(actorLang, "action.choose_alive"), true);
+        return;
+      }
+      game.night.stalkerKill = targetId;
+      saveGame(game);
+      await updateTelegramActionMessage(
+        ctx,
+        t(actorLang, "action.stalker_kill", { target: mention(targetId) }),
+        undefined
+      );
+    }
+
+    if (maybeShortenPhase(game, "night")) {
+      await announceToChannelLocalized(null, game, "warn.shortened_night");
+      await postOrUpdateDashboard(null, game);
+      saveGame(game);
+    }
+
+    if (nightReady(game)) {
+      clearPhaseTimers(channelId);
+      await resolveNight(null, game, false);
+    }
+    await answerTelegramCallback(ctx);
+  });
+}
+
+async function handleTelegramLobbyAction(ctx, data) {
+  const rawChatId = data.chatId || ctx?.chat?.id;
+  const channelId = makeChannelKey(PLATFORM_TELEGRAM, rawChatId);
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = getUserLang(userId);
+
+  if (!rawChatId) {
+    await answerTelegramCallback(ctx, t(lang, "err.channel_unknown"), true);
+    return;
+  }
+
+  if (isMaintenanceEnabled() && !isDevUser(userId)) {
+    await answerTelegramCallback(ctx, t(lang, "maintenance.blocked"), true);
+    return;
+  }
+
+  await withChannelLock(channelId, async () => {
+    const game = getGame(channelId);
+    if (!game || game.state !== "lobby") {
+      await answerTelegramCallback(ctx, t(lang, "err.lobby_not_active"), true);
+      return;
+    }
+
+    if (data.action === ACTIONS.LOBBY_JOIN) {
+      const blocking = findBlockingGame(userId, channelId);
+      if (blocking) {
+        await answerTelegramCallback(
+          ctx,
+          t(lang, "err.already_in_other", { channel: channelMention(blocking.channelId) }),
+          true
+        );
+        return;
+      }
+      if (game.players[userId]) {
+        await answerTelegramCallback(ctx, t(lang, "err.already_in"), true);
+        return;
+      }
+      game.players[userId] = {
+        id: userId,
+        role: null,
+        alive: true,
+        joinedAt: now(),
+        name: tgUserCache.get(userId)?.label || null,
+        ready: false,
+      };
+      saveGame(game);
+      await announceToChannelLocalized(null, game, "lobby.joined", async (l) => ({
+        user: await getNameOrMention(null, game, userId, l),
+        count: Object.keys(game.players).length,
+      }));
+      await postOrUpdateLobbyPanel(null, game);
+      await postOrUpdateDashboard(null, game);
+      saveGame(game);
+      await updateHomeForGame(null, game);
+      await answerTelegramCallback(ctx);
+      return;
+    }
+
+    if (data.action === ACTIONS.LOBBY_LEAVE) {
+      if (!game.players[userId]) {
+        await answerTelegramCallback(ctx, t(lang, "err.not_in_lobby"), true);
+        return;
+      }
+      delete game.players[userId];
+      if (game.hostId === userId) {
+        const remaining = Object.values(game.players).sort(
+          (a, b) => a.joinedAt - b.joinedAt
+        );
+        game.hostId = remaining[0]?.id || null;
+      }
+      if (!game.hostId) {
+        await closeLobby(null, game, { key: "lobby.empty_closed" });
+        await answerTelegramCallback(ctx);
+        return;
+      }
+      saveGame(game);
+      await announceToChannelLocalized(null, game, "lobby.left", async (l) => ({
+        user: await getNameOrMention(null, game, userId, l),
+        count: Object.keys(game.players).length,
+      }));
+      await postOrUpdateLobbyPanel(null, game);
+      await postOrUpdateDashboard(null, game);
+      saveGame(game);
+      await updateHomeForGame(null, game);
+      await answerTelegramCallback(ctx);
+      return;
+    }
+
+    if (data.action === ACTIONS.LOBBY_START) {
+      if (game.hostId !== userId) {
+        await answerTelegramCallback(ctx, t(lang, "err.only_host_start"), true);
+        return;
+      }
+      if (Object.keys(game.players).length < game.config.minPlayers) {
+        await answerTelegramCallback(
+          ctx,
+          t(lang, "err.need_min_players", { min: game.config.minPlayers }),
+          true
+        );
+        return;
+      }
+      await startGameFromLobby(null, game, { key: "lobby.host_start" });
+      await answerTelegramCallback(ctx);
+      return;
+    }
+
+    if (data.action === ACTIONS.LOBBY_READY) {
+      if (!game.players[userId]) {
+        await answerTelegramCallback(ctx, t(lang, "err.not_in_lobby"), true);
+        return;
+      }
+      game.players[userId].ready = !game.players[userId].ready;
+      saveGame(game);
+      await postOrUpdateLobbyPanel(null, game);
+      await postOrUpdateDashboard(null, game);
+      saveGame(game);
+      await updateHomeForGame(null, game);
+      if (
+        Object.keys(game.players).length >= game.config.minPlayers &&
+        allPlayersReady(game)
+      ) {
+        await startGameFromLobby(null, game, { key: "lobby.ready_start" });
+      }
+      await answerTelegramCallback(ctx);
+      return;
+    }
+
+    if (data.action === ACTIONS.LOBBY_EXTEND) {
+      if (!canExtendLobby(game, userId)) {
+        await answerTelegramCallback(ctx, t(lang, "err.extend_not_allowed"), true);
+        return;
+      }
+      const minutes = DEFAULTS.LOBBY_EXTEND_MINUTES;
+      game.phaseDeadline =
+        Math.max(now(), game.phaseDeadline || now()) + toMs(minutes);
+      schedulePhaseTimers(game);
+      saveGame(game);
+      await announceToChannelLocalized(null, game, "lobby.extended", () => ({
+        minutes,
+      }));
+      await postOrUpdateLobbyPanel(null, game);
+      await postOrUpdateDashboard(null, game);
+      saveGame(game);
+      await updateHomeForGame(null, game);
+      await answerTelegramCallback(ctx);
+      return;
+    }
+
+    if (data.action === ACTIONS.LOBBY_END) {
+      if (game.hostId !== userId) {
+        await answerTelegramCallback(ctx, t(lang, "err.only_host_end"), true);
+        return;
+      }
+      await closeLobby(null, game, { key: "lobby.end" });
+      await answerTelegramCallback(ctx);
+    }
+  });
+}
+
+async function handleTelegramChannelListingAction(ctx, data) {
+  const rawChatId = data.chatId;
+  const channelId = makeChannelKey(PLATFORM_TELEGRAM, rawChatId);
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = getUserLang(userId);
+  const pref = getChannelPref(channelId) || ensureChannelPref(channelId);
+
+  if (!rawChatId) {
+    await answerTelegramCallback(ctx, t(lang, "err.channel_unknown"), true);
+    return;
+  }
+
+  const isPublicAction = data.action === ACTIONS.CHANNEL_LIST_PUBLIC;
+  const chatInfo = tgChatCache.get(channelId);
+  const isPublicChat = Boolean(chatInfo?.username);
+  if (isPublicAction && !isPublicChat) {
+    await updateTelegramActionMessage(ctx, t(lang, "find.private_not_allowed"));
+    setChannelListing(channelId, 0, {
+      channelType: pref?.channel_type || chatInfo?.type || null,
+      listedBy: userId,
+    });
+    await answerTelegramCallback(ctx);
+    return;
+  }
+
+  setChannelListing(channelId, isPublicAction, {
+    channelType: pref?.channel_type || chatInfo?.type || null,
+    listedBy: userId,
+  });
+
+  const channel = channelMention(channelId);
+  const text = t(lang, isPublicAction ? "find.set_public" : "find.set_private", {
+    channel,
+  });
+  await updateTelegramActionMessage(ctx, text);
+  await answerTelegramCallback(ctx);
+}
+
+async function handleTelegramChannelLangAction(ctx, data) {
+  const rawChatId = data.chatId;
+  const channelId = makeChannelKey(PLATFORM_TELEGRAM, rawChatId);
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = getUserLang(userId);
+  const pref = getChannelPref(channelId);
+
+  if (!pref || pref.listed_by !== userId) {
+    await answerTelegramCallback(ctx, t(lang, "my_channels.not_owner"), true);
+    return;
+  }
+
+  const newLang = data.action === ACTIONS.CHANNEL_LANG_RU ? "ru" : "en";
+  const settings = {
+    ...getChannelSettings(channelId),
+    channelLang: newLang,
+  };
+  setChannelSettings(channelId, settings, { listedBy: pref.listed_by });
+
+  const game = getGame(channelId);
+  if (game && game.state === "lobby") {
+    applyChannelSettingsToGame(game, settings);
+    saveGame(game);
+    await postOrUpdateLobbyPanel(null, game);
+    await postOrUpdateDashboard(null, game);
+    saveGame(game);
+  }
+
+  const { text, reply_markup } = buildTelegramChannelEditMessage(channelId, lang);
+  await updateTelegramActionMessage(ctx, text, reply_markup);
+  await answerTelegramCallback(ctx);
+}
+
+async function handleTelegramMyChannelsAction(ctx, data) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = getUserLang(userId);
+  const page = data.page || 0;
+
+  if (data.action === ACTIONS.MY_CHANNELS_OPEN) {
+    const message = await buildTelegramMyChannelsMessage(userId, lang, 0);
+    await updateTelegramActionMessage(ctx, message.text, message.reply_markup);
+    await answerTelegramCallback(ctx);
+    return;
+  }
+
+  if (data.action === ACTIONS.MY_CHANNELS_PAGE_PREV || data.action === ACTIONS.MY_CHANNELS_PAGE_NEXT) {
+    const delta = data.action === ACTIONS.MY_CHANNELS_PAGE_NEXT ? 1 : -1;
+    const message = await buildTelegramMyChannelsMessage(userId, lang, page + delta);
+    await updateTelegramActionMessage(ctx, message.text, message.reply_markup);
+    await answerTelegramCallback(ctx);
+    return;
+  }
+
+  if (data.action === ACTIONS.CHANNEL_EDIT_OPEN) {
+    const channelId = makeChannelKey(PLATFORM_TELEGRAM, data.chatId);
+    const pref = getChannelPref(channelId);
+    if (!pref || pref.listed_by !== userId) {
+      await answerTelegramCallback(ctx, t(lang, "my_channels.not_owner"), true);
+      return;
+    }
+    const { text, reply_markup } = buildTelegramChannelEditMessage(channelId, lang);
+    await updateTelegramActionMessage(ctx, text, reply_markup);
+    await answerTelegramCallback(ctx);
+  }
+}
+
+async function handleTelegramFindGamesAction(ctx, data) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = getUserLang(userId);
+  const currentFilter = data.chatId || "recruiting";
+  const currentLang = data.target || "all";
+  let filter = currentFilter;
+  let langFilter = currentLang;
+  let page = data.page || 0;
+
+  if (data.action === ACTIONS.FIND_FILTER_ACTIVE) {
+    filter = "active";
+    page = 0;
+  } else if (data.action === ACTIONS.FIND_FILTER_RECRUITING) {
+    filter = "recruiting";
+    page = 0;
+  } else if (data.action === ACTIONS.FIND_FILTER_INACTIVE) {
+    filter = "inactive";
+    page = 0;
+  } else if (data.action === ACTIONS.FIND_LANG_ALL) {
+    langFilter = "all";
+    page = 0;
+  } else if (data.action === ACTIONS.FIND_LANG_EN) {
+    langFilter = "en";
+    page = 0;
+  } else if (data.action === ACTIONS.FIND_LANG_RU) {
+    langFilter = "ru";
+    page = 0;
+  } else if (data.action === ACTIONS.FIND_PAGE_PREV) {
+    page = Math.max(0, page - 1);
+  } else if (data.action === ACTIONS.FIND_PAGE_NEXT) {
+    page += 1;
+  }
+
+  const message = buildTelegramFindGamesMessage(lang, filter, page, langFilter);
+  await updateTelegramActionMessage(ctx, message.text, message.reply_markup);
+  await answerTelegramCallback(ctx);
+}
+
+async function handleTelegramFaqAction(ctx, data) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = getUserLang(userId);
+  const page = data.page || 0;
+
+  if (data.action === ACTIONS.FAQ_OPEN) {
+    const message = buildTelegramFaqList(lang, page);
+    await updateTelegramActionMessage(ctx, message.text, message.reply_markup);
+    await answerTelegramCallback(ctx);
+    return;
+  }
+
+  if (data.action === ACTIONS.FAQ_PAGE_PREV || data.action === ACTIONS.FAQ_PAGE_NEXT) {
+    const delta = data.action === ACTIONS.FAQ_PAGE_NEXT ? 1 : -1;
+    const message = buildTelegramFaqList(lang, page + delta);
+    await updateTelegramActionMessage(ctx, message.text, message.reply_markup);
+    await answerTelegramCallback(ctx);
+    return;
+  }
+
+  if (data.action === ACTIONS.FAQ_TOPIC) {
+    const message = buildTelegramFaqDetail(lang, data.chatId, page);
+    await updateTelegramActionMessage(ctx, message.text, message.reply_markup);
+    await answerTelegramCallback(ctx);
+    return;
+  }
+
+  if (data.action === ACTIONS.FAQ_BACK) {
+    const message = buildTelegramFaqList(lang, page);
+    await updateTelegramActionMessage(ctx, message.text, message.reply_markup);
+    await answerTelegramCallback(ctx);
+  }
+}
+
+async function handleTelegramHelpAction(ctx, data) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = getUserLang(userId);
+  let text = t(lang, "dm.help_intro_tg");
+  if (data.action === ACTIONS.DM_HELP_ADD) text = t(lang, "dm.help_add_tg");
+  if (data.action === ACTIONS.DM_HELP_COMMANDS)
+    text = t(lang, "dm.help_commands_tg");
+  if (data.action === ACTIONS.DM_HELP_SETTINGS)
+    text = t(lang, "dm.help_settings_tg");
+  text = withDevHint(text, lang, userId);
+
+  const reply_markup = buildTelegramDmHelpKeyboard(lang);
+  await updateTelegramActionMessage(ctx, text, reply_markup);
+  await answerTelegramCallback(ctx);
+}
+
+async function handleTelegramRoleHelpAction(ctx, data) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = getUserLang(userId);
+  const role = data.chatId;
+  const helpKey = `role_help.${role}`;
+  const helpText = t(lang, helpKey) || t(lang, "role_help.town");
+
+  let channel = "-";
+  const game = getUserCurrentGame(userId);
+  if (game) channel = channelMention(game.channelId);
+
+  const text = `${t(lang, "action.role_dm", {
+    channel,
+    role: roleLabel(role, lang),
+  })}\n\n${helpText}`;
+
+  await updateTelegramActionMessage(ctx, text, undefined);
+  await answerTelegramCallback(ctx);
+}
+
+async function handleTelegramLangSelect(ctx, data) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const choice = data.action === ACTIONS.LANG_SELECT_RU ? "ru" : "en";
+  const updated = setUserLang(userId, choice);
+  const text =
+    updated.lang === "ru" ? t("ru", "dm.lang_set_ru") : t("en", "dm.lang_set_en");
+  await updateTelegramActionMessage(ctx, text, undefined);
+  await answerTelegramCallback(ctx);
+}
+
+async function handleTelegramDevToggle(ctx) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = getUserLang(userId);
+
+  if (!isDevUser(userId)) {
+    await answerTelegramCallback(ctx, t(lang, "dev.not_authorized"), true);
+    return;
+  }
+
+  const state = getMaintenanceState();
+  const enabled = !state.enabled;
+  setMaintenanceState({
+    enabled,
+    by: userId,
+    requested_at: now(),
+    notified: enabled ? false : state.notified,
+  });
+
+  if (enabled) {
+    await closeAllLobbiesForMaintenance(null);
+  }
+
+  await maybeNotifyMaintenanceDone(null);
+
+  const status = enabled
+    ? t(lang, "dev.panel.status_on")
+    : t(lang, "dev.panel.status_off");
+  const buttonText = enabled
+    ? t(lang, "dev.panel.button_disable")
+    : t(lang, "dev.panel.button_enable");
+  const reply_markup = Markup.inlineKeyboard([
+    [Markup.button.callback(buttonText, buildTelegramCallback(ACTIONS.DEV_MAINT_TOGGLE, ""))],
+  ]).reply_markup;
+  await updateTelegramActionMessage(ctx, `${t(lang, "dev.panel.title")}\n${status}`, reply_markup);
+  await answerTelegramCallback(ctx);
+}
+
+async function handleTelegramCallback(ctx) {
+  const data = parseTelegramCallback(ctx?.callbackQuery?.data);
+  if (!data) {
+    await answerTelegramCallback(ctx);
+    return;
+  }
+
+  if (data.action === "noop") {
+    await answerTelegramCallback(ctx);
+    return;
+  }
+
+  if (data.action === ACTIONS.ROLE_HELP) {
+    await handleTelegramRoleHelpAction(ctx, data);
+    return;
+  }
+
+  if (data.action === ACTIONS.LANG_SELECT_EN || data.action === ACTIONS.LANG_SELECT_RU) {
+    await handleTelegramLangSelect(ctx, data);
+    return;
+  }
+
+  if (data.action === ACTIONS.DEV_MAINT_TOGGLE) {
+    await handleTelegramDevToggle(ctx);
+    return;
+  }
+
+  if (data.action === ACTIONS.DETECTIVE_MODE_CHECK || data.action === ACTIONS.DETECTIVE_MODE_KILL) {
+    await handleTelegramDetectiveMode(ctx, data);
+    return;
+  }
+
+  if (data.action === ACTIONS.PAGE_PREV || data.action === ACTIONS.PAGE_NEXT) {
+    await handleTelegramPageAction(ctx, data);
+    return;
+  }
+
+  if (
+    data.action === ACTIONS.DAY_VOTE ||
+    data.action === ACTIONS.MAFIA_VOTE ||
+    data.action === ACTIONS.DOCTOR_SAVE ||
+    data.action === ACTIONS.DETECTIVE_CHECK ||
+    data.action === ACTIONS.DETECTIVE_KILL ||
+    data.action === ACTIONS.BODYGUARD_PROTECT ||
+    data.action === ACTIONS.BUM_VISIT ||
+    data.action === ACTIONS.LAWYER_PROTECT ||
+    data.action === ACTIONS.STALKER_KILL
+  ) {
+    await handleTelegramPlayerAction(ctx, data);
+    return;
+  }
+
+  if (
+    data.action === ACTIONS.LOBBY_JOIN ||
+    data.action === ACTIONS.LOBBY_LEAVE ||
+    data.action === ACTIONS.LOBBY_START ||
+    data.action === ACTIONS.LOBBY_EXTEND ||
+    data.action === ACTIONS.LOBBY_END ||
+    data.action === ACTIONS.LOBBY_READY
+  ) {
+    await handleTelegramLobbyAction(ctx, data);
+    return;
+  }
+
+  if (
+    data.action === ACTIONS.CHANNEL_LIST_PUBLIC ||
+    data.action === ACTIONS.CHANNEL_LIST_PRIVATE
+  ) {
+    await handleTelegramChannelListingAction(ctx, data);
+    return;
+  }
+
+  if (
+    data.action === ACTIONS.CHANNEL_LANG_EN ||
+    data.action === ACTIONS.CHANNEL_LANG_RU
+  ) {
+    await handleTelegramChannelLangAction(ctx, data);
+    return;
+  }
+
+  if (data.action === ACTIONS.MY_CHANNELS_OPEN) {
+    if (data.chatId === "list") {
+      await handleTelegramMyChannelsAction(ctx, data);
+      return;
+    }
+    const userId = getTelegramUserKeyFromCtx(ctx);
+    const lang = getUserLang(userId);
+    const message = await buildTelegramMyChannelsMessage(userId, lang, 0);
+    await replyToTelegramMessage(ctx, message.text, message.reply_markup);
+    await answerTelegramCallback(ctx);
+    return;
+  }
+
+  if (
+    data.action === ACTIONS.MY_CHANNELS_PAGE_PREV ||
+    data.action === ACTIONS.MY_CHANNELS_PAGE_NEXT ||
+    data.action === ACTIONS.CHANNEL_EDIT_OPEN
+  ) {
+    await handleTelegramMyChannelsAction(ctx, data);
+    return;
+  }
+
+  if (
+    data.action === ACTIONS.FIND_FILTER_ACTIVE ||
+    data.action === ACTIONS.FIND_FILTER_RECRUITING ||
+    data.action === ACTIONS.FIND_FILTER_INACTIVE ||
+    data.action === ACTIONS.FIND_LANG_ALL ||
+    data.action === ACTIONS.FIND_LANG_EN ||
+    data.action === ACTIONS.FIND_LANG_RU ||
+    data.action === ACTIONS.FIND_PAGE_PREV ||
+    data.action === ACTIONS.FIND_PAGE_NEXT
+  ) {
+    await handleTelegramFindGamesAction(ctx, data);
+    return;
+  }
+
+  if (
+    data.action === ACTIONS.FAQ_TOPIC ||
+    data.action === ACTIONS.FAQ_BACK ||
+    data.action === ACTIONS.FAQ_PAGE_PREV ||
+    data.action === ACTIONS.FAQ_PAGE_NEXT ||
+    (data.action === ACTIONS.FAQ_OPEN && data.chatId === "list")
+  ) {
+    await handleTelegramFaqAction(ctx, data);
+    return;
+  }
+
+  if (
+    data.action === ACTIONS.DM_HELP_ADD ||
+    data.action === ACTIONS.DM_HELP_COMMANDS ||
+    data.action === ACTIONS.DM_HELP_SETTINGS
+  ) {
+    await handleTelegramHelpAction(ctx, data);
+    return;
+  }
+
+  if (data.action === ACTIONS.FIND_GAMES_OPEN) {
+    const userId = getTelegramUserKeyFromCtx(ctx);
+    const lang = getUserLang(userId);
+    const message = buildTelegramFindGamesMessage(lang, "recruiting", 0, "all");
+    await replyToTelegramMessage(ctx, message.text, message.reply_markup);
+    await answerTelegramCallback(ctx);
+    return;
+  }
+
+  if (data.action === ACTIONS.FAQ_OPEN) {
+    const userId = getTelegramUserKeyFromCtx(ctx);
+    const lang = getUserLang(userId);
+    const message = buildTelegramFaqList(lang, 0);
+    await replyToTelegramMessage(ctx, message.text, message.reply_markup);
+    await answerTelegramCallback(ctx);
+    return;
+  }
+
+  await answerTelegramCallback(ctx);
+}
+
+async function handleTelegramPrivateCommand(ctx, command, args) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const userLangInfo = getUserLangInfo(userId);
+  const userLang = userLangInfo.lang;
+
+  if (isMaintenanceEnabled() && !isDevUser(userId)) {
+    const allowCommands = ["lang", "whisper"];
+    const activeGame = getUserCurrentGame(userId);
+    const hasActiveGame =
+      activeGame && (activeGame.state === "day" || activeGame.state === "night");
+    if (!allowCommands.includes(command) || !hasActiveGame) {
+      await replyToTelegramMessage(ctx, t(userLang, "maintenance.reply"));
+      return;
+    }
+  }
+
+  if (command === "dev") {
+    if (!isDevUser(userId)) {
+      await replyToTelegramMessage(ctx, t(userLang, "dev.not_authorized"));
+      return;
+    }
+    const code = (args[0] || "").trim();
+    if (!isDevCode(code)) {
+      await replyToTelegramMessage(ctx, t(userLang, "dev.code_invalid"));
+      return;
+    }
+    await sendDevPanel(null, userId);
+    return;
+  }
+
+  if (command === "lang") {
+    const choice = (args[0] || "").toLowerCase();
+    if (!LANGS.includes(choice)) {
+      await replyToTelegramMessage(ctx, t(userLang, "dm.lang_usage"));
+      return;
+    }
+    const updated = setUserLang(userId, choice);
+    await replyToTelegramMessage(
+      ctx,
+      updated.lang === "ru" ? t("ru", "dm.lang_set_ru") : t("en", "dm.lang_set_en")
+    );
+    return;
+  }
+
+  if (command === "home") {
+    const text = await buildTelegramHomeText(userId, userLang);
+    await replyToTelegramMessage(ctx, text);
+    return;
+  }
+
+  if (command === "faq") {
+    const faqId = args[0] ? String(args[0]).trim().toLowerCase() : null;
+    const message = faqId
+      ? buildTelegramFaqDetail(userLang, faqId, 0)
+      : buildTelegramFaqList(userLang, 0);
+    await replyToTelegramMessage(ctx, message.text, message.reply_markup);
+    return;
+  }
+
+  if (command === "find") {
+    const message = buildTelegramFindGamesMessage(userLang, "recruiting", 0, "all");
+    await replyToTelegramMessage(ctx, message.text, message.reply_markup);
+    return;
+  }
+
+  if (command === "mychannels" || command === "my_channels") {
+    const message = await buildTelegramMyChannelsMessage(userId, userLang, 0);
+    await replyToTelegramMessage(ctx, message.text, message.reply_markup);
+    return;
+  }
+
+  if (command === "whisper") {
+    if (isMaintenanceEnabled() && !isDevUser(userId)) {
+      await replyToTelegramMessage(ctx, t(userLang, "maintenance.reply"));
+      return;
+    }
+    const whisperText = args.join(" ").trim();
+    if (!whisperText) {
+      await replyToTelegramMessage(ctx, t(userLang, "whisper.usage"));
+      return;
+    }
+    const game = getUserCurrentGame(userId);
+    if (!game) {
+      await replyToTelegramMessage(ctx, t(userLang, "action.not_in_game"));
+      return;
+    }
+    await withChannelLock(game.channelId, async () => {
+      if (game.state !== "day") {
+        await replyToTelegramMessage(ctx, t(userLang, "whisper.not_day"));
+        return;
+      }
+      if (!game.config.whisperEnabled) {
+        await replyToTelegramMessage(ctx, t(userLang, "whisper.disabled"));
+        return;
+      }
+      if (!isPlayerAlive(game, userId)) {
+        await replyToTelegramMessage(ctx, t(userLang, "action.not_in_game"));
+        return;
+      }
+      if (game.whispersUsed[userId] === game.round) {
+        await replyToTelegramMessage(ctx, t(userLang, "whisper.already_used"));
+        return;
+      }
+      game.whispersUsed[userId] = game.round;
+      saveGame(game);
+      await announceToChannelLocalized(null, game, "whisper.post", () => ({
+        text: whisperText,
+      }));
+      await replyToTelegramMessage(ctx, t(userLang, "whisper.sent"));
+      await postOrUpdateDashboard(null, game);
+    });
+    return;
+  }
+
+  const helpText = withDevHint(
+    t(userLang, "dm.help_intro_tg"),
+    userLang,
+    userId
+  );
+  await replyToTelegramMessage(ctx, helpText, buildTelegramDmHelpKeyboard(userLang));
+}
+
+async function handleTelegramPrivateText(ctx) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const text = (ctx.message?.text || "").trim();
+  if (!text) return;
+
+  if (text.startsWith("/")) {
+    return;
+  }
+
+  const langMatch = text.match(/^lang\s+(en|ru)$/i);
+  if (langMatch) {
+    await handleTelegramPrivateCommand(ctx, "lang", [langMatch[1]]);
+    return;
+  }
+
+  const langInfo = getUserLangInfo(userId);
+  const userLang = langInfo.lang;
+
+  const pendingLastWords = getLastWordsEntry(userId);
+  if (pendingLastWords) {
+    if (now() > pendingLastWords.expiresAt) {
+      clearLastWords(userId);
+      await replyToTelegramMessage(ctx, t(userLang, "last_words.expired"));
+      return;
+    }
+
+    const name = await getUserLabel(null, userId);
+    const pendingGame = getGame(pendingLastWords.channelId);
+    if (pendingGame) {
+      await announceToChannelLocalized(
+        null,
+        pendingGame,
+        "last_words.post",
+        () => ({ name, text })
+      );
+    } else {
+      await announceToChannel(
+        null,
+        pendingLastWords.channelId,
+        t("en", "last_words.post", { name, text })
+      );
+    }
+    clearLastWords(userId);
+    await replyToTelegramMessage(ctx, t(userLang, "last_words.received"));
+    return;
+  }
+
+  if (!langInfo.explicit && !languagePrompted.has(userId)) {
+    languagePrompted.add(userId);
+    const promptText = t("en", "dm.lang_prompt");
+    await replyToTelegramMessage(ctx, promptText, buildTelegramLangKeyboard());
+    return;
+  }
+
+  if (isMaintenanceEnabled() && !isDevUser(userId)) {
+    await replyToTelegramMessage(ctx, t(userLang, "maintenance.reply"));
+    return;
+  }
+
+  const helpText = withDevHint(
+    t(userLang, "dm.help_intro_tg"),
+    userLang,
+    userId
+  );
+  await replyToTelegramMessage(ctx, helpText, buildTelegramDmHelpKeyboard(userLang));
+}
+
+async function handleTelegramGroupCommand(ctx, command, args) {
+  const channelId = getTelegramChannelKeyFromCtx(ctx);
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = getUserLang(userId);
+
+  if (isMaintenanceEnabled() && !isDevUser(userId)) {
+    await replyToTelegramMessage(ctx, t(lang, "maintenance.reply"));
+    return;
+  }
+
+  await promptTelegramChannelListing(ctx.chat.id, userId, ctx.chat.type);
+
+  await withChannelLock(channelId, async () => {
+    let game = getGame(channelId);
+
+    if (command === "help") {
+      await replyToTelegramMessage(ctx, t(lang, "help.commands"));
+      return;
+    }
+
+    if (command === "create") {
+      if (game && game.state !== "ended") {
+        await replyToTelegramMessage(ctx, t(lang, "err.lobby_exists"));
+        return;
+      }
+      const blocking = findBlockingGame(userId, channelId);
+      if (blocking) {
+        await replyToTelegramMessage(
+          ctx,
+          t(lang, "err.already_in_other", { channel: channelMention(blocking.channelId) })
+        );
+        return;
+      }
+      game = createLobby(channelId, userId, PLATFORM_TELEGRAM);
+      const channelSettings = getChannelSettings(channelId);
+      applyChannelSettingsToGame(game, channelSettings);
+      gameCache.set(channelId, game);
+      saveGame(game);
+      schedulePhaseTimers(game);
+      await announceToChannelLocalized(null, game, "lobby.created", async (l) => ({
+        host: await getNameOrMention(null, game, userId, l),
+      }));
+      await postOrUpdateLobbyPanel(null, game);
+      await postOrUpdateDashboard(null, game);
+      saveGame(game);
+      await updateHomeForUsers(null, [userId, ...Object.keys(game.players || {})]);
+      return;
+    }
+
+    if (command === "join") {
+      if (!game || game.state !== "lobby") {
+        await replyToTelegramMessage(ctx, t(lang, "err.lobby_none"));
+        return;
+      }
+      const blocking = findBlockingGame(userId, channelId);
+      if (blocking) {
+        await replyToTelegramMessage(
+          ctx,
+          t(lang, "err.already_in_other", { channel: channelMention(blocking.channelId) })
+        );
+        return;
+      }
+      if (game.players[userId]) {
+        await replyToTelegramMessage(ctx, t(lang, "err.already_in"));
+        return;
+      }
+      game.players[userId] = {
+        id: userId,
+        role: null,
+        alive: true,
+        joinedAt: now(),
+        name: tgUserCache.get(userId)?.label || null,
+        ready: false,
+      };
+      saveGame(game);
+      await announceToChannelLocalized(null, game, "lobby.joined", async (l) => ({
+        user: await getNameOrMention(null, game, userId, l),
+        count: Object.keys(game.players).length,
+      }));
+      await postOrUpdateLobbyPanel(null, game);
+      await postOrUpdateDashboard(null, game);
+      saveGame(game);
+      await updateHomeForGame(null, game);
+      return;
+    }
+
+    if (command === "leave") {
+      if (!game || game.state !== "lobby") {
+        await replyToTelegramMessage(ctx, t(lang, "err.lobby_only"));
+        return;
+      }
+      if (!game.players[userId]) {
+        await replyToTelegramMessage(ctx, t(lang, "err.not_in_lobby"));
+        return;
+      }
+      delete game.players[userId];
+      if (game.hostId === userId) {
+        const remaining = Object.values(game.players).sort(
+          (a, b) => a.joinedAt - b.joinedAt
+        );
+        game.hostId = remaining[0]?.id || null;
+      }
+      if (!game.hostId) {
+        await closeLobby(null, game, { key: "lobby.empty_closed" });
+        return;
+      }
+      saveGame(game);
+      await announceToChannelLocalized(null, game, "lobby.left", async (l) => ({
+        user: await getNameOrMention(null, game, userId, l),
+        count: Object.keys(game.players).length,
+      }));
+      await postOrUpdateLobbyPanel(null, game);
+      await postOrUpdateDashboard(null, game);
+      saveGame(game);
+      await updateHomeForGame(null, game);
+      return;
+    }
+
+    if (command === "start") {
+      if (!game || game.state !== "lobby") {
+        await replyToTelegramMessage(ctx, t(lang, "err.lobby_start_none"));
+        return;
+      }
+      if (game.hostId !== userId) {
+        await replyToTelegramMessage(ctx, t(lang, "err.only_host_start"));
+        return;
+      }
+      if (Object.keys(game.players).length < game.config.minPlayers) {
+        await replyToTelegramMessage(
+          ctx,
+          t(lang, "err.need_min_players", { min: game.config.minPlayers })
+        );
+        return;
+      }
+      await startGameFromLobby(null, game, { key: "lobby.host_start" });
+      return;
+    }
+
+    if (command === "status") {
+      if (!game) {
+        await replyToTelegramMessage(ctx, t(lang, "err.game_not_created"));
+        return;
+      }
+      const alive = await listAliveDisplay(null, game, lang);
+      await replyToTelegramMessage(
+        ctx,
+        t(lang, "status.text", {
+          state: t(lang, `state.${game.state}`),
+          host: await getNameOrMention(null, game, game.hostId, lang),
+          alive,
+        })
+      );
+      return;
+    }
+
+    if (command === "config") {
+      if (!game || game.state !== "lobby") {
+        await replyToTelegramMessage(ctx, t(lang, "err.config_lobby_only"));
+        return;
+      }
+      if (game.hostId !== userId) {
+        await replyToTelegramMessage(ctx, t(lang, "err.config_host_only"));
+        return;
+      }
+
+      if (args.length === 0) {
+        await replyToTelegramMessage(
+          ctx,
+          t(lang, "config.summary", {
+            day: Math.round(game.config.dayMs / 60000),
+            night: Math.round(game.config.nightMs / 60000),
+            lobby: Math.round(game.config.lobbyMs / 60000),
+            min: game.config.minPlayers,
+            extend: game.config.extendPolicy,
+          })
+        );
+        return;
+      }
+
+      const key = args[0];
+      if (key === "extend") {
+        const policy = (args[1] || "").toLowerCase();
+        if (!["host", "any"].includes(policy)) {
+          await replyToTelegramMessage(ctx, t(lang, "err.config_usage_extend"));
+          return;
+        }
+        game.config.extendPolicy = policy;
+      } else if (key === "lang") {
+        const choice = (args[1] || "").toLowerCase();
+        if (!LANGS.includes(choice)) {
+          await replyToTelegramMessage(ctx, t(lang, "dm.lang_usage"));
+          return;
+        }
+        game.config.channelLang = choice;
+        const settings = {
+          ...getChannelSettings(channelId),
+          channelLang: choice,
+        };
+        setChannelSettings(channelId, settings);
+      } else {
+        const value = Number(args[1]);
+        if (!value || Number.isNaN(value)) {
+          await replyToTelegramMessage(ctx, t(lang, "err.config_usage_numbers"));
+          return;
+        }
+        if (key === "day") {
+          game.config.dayMs = toMs(value);
+        } else if (key === "night") {
+          game.config.nightMs = toMs(value);
+        } else if (key === "lobby") {
+          game.config.lobbyMs = toMs(value);
+          if (game.state === "lobby") {
+            game.phaseDeadline = now() + game.config.lobbyMs;
+            schedulePhaseTimers(game);
+          }
+        } else if (key === "min") {
+          game.config.minPlayers = Math.max(4, Math.floor(value));
+        } else {
+          await replyToTelegramMessage(ctx, t(lang, "err.config_options"));
+          return;
+        }
+      }
+
+      saveGame(game);
+      await replyToTelegramMessage(ctx, t(lang, "ok.settings_updated"));
+      if (game.state === "lobby") {
+        await postOrUpdateLobbyPanel(null, game);
+        await postOrUpdateDashboard(null, game);
+        saveGame(game);
+        await updateHomeForGame(null, game);
+      }
+      return;
+    }
+
+    if (command === "extend") {
+      if (!game || game.state !== "lobby") {
+        await replyToTelegramMessage(ctx, t(lang, "err.extend_lobby_only"));
+        return;
+      }
+      if (!canExtendLobby(game, userId)) {
+        await replyToTelegramMessage(ctx, t(lang, "err.extend_not_allowed"));
+        return;
+      }
+      const minutes = Number(args[0]) || DEFAULTS.LOBBY_EXTEND_MINUTES;
+      game.phaseDeadline =
+        Math.max(now(), game.phaseDeadline || now()) + toMs(minutes);
+      schedulePhaseTimers(game);
+      saveGame(game);
+      await announceToChannelLocalized(null, game, "lobby.extended", () => ({
+        minutes,
+      }));
+      await postOrUpdateLobbyPanel(null, game);
+      await postOrUpdateDashboard(null, game);
+      saveGame(game);
+      await updateHomeForGame(null, game);
+      return;
+    }
+
+    if (command === "end") {
+      if (!game) {
+        await replyToTelegramMessage(ctx, t(lang, "err.no_active_game"));
+        return;
+      }
+      if (game.hostId !== userId) {
+        await replyToTelegramMessage(ctx, t(lang, "err.only_host_end"));
+        return;
+      }
+      clearPhaseTimers(channelId);
+      if (game.state === "lobby") {
+        await closeLobby(null, game, { key: "lobby.end" });
+      } else {
+        await finalizeDashboard(null, game);
+        gameCache.delete(channelId);
+        deleteGame(channelId);
+        await announceToChannelLocalized(null, game, "lobby.end");
+        await updateHomeForUsers(null, Object.keys(game.players || {}));
+        await maybeNotifyMaintenanceDone(null);
+      }
+      return;
+    }
+
+    await replyToTelegramMessage(ctx, t(lang, "err.unknown_command"));
+  });
+}
+
+async function startTelegram() {
+  if (!TELEGRAM_BOT_TOKEN) return;
+  telegramBot = new Telegraf(TELEGRAM_BOT_TOKEN);
+
+  telegramBot.use(async (ctx, next) => {
+    if (ctx.from) cacheTelegramUser(ctx.from);
+    const chat = ctx.chat || ctx.callbackQuery?.message?.chat;
+    if (chat) cacheTelegramChat(chat);
+    return next();
+  });
+
+  telegramBot.use(async (ctx, next) => {
+    if (ctx.updateType !== "message") return next();
+    if (isTelegramPrivateChat(ctx)) return next();
+    if (!ctx.message?.from || ctx.message.from.is_bot) return next();
+
+    const channelId = getTelegramChannelKeyFromCtx(ctx);
+    const userId = getTelegramUserKeyFromCtx(ctx);
+    const game = getGame(channelId);
+    if (!game || game.state === "ended") return next();
+    if (!game.players[userId]) return next();
+    if (isPlayerAlive(game, userId)) return next();
+
+    try {
+      await ctx.deleteMessage();
+    } catch (err) {
+      const channelLang = getChannelLangForGame(game);
+      await replyToTelegramMessage(ctx, t(channelLang, "dead.message_deleted"));
+    }
+    return;
+  });
+
+  telegramBot.on("callback_query", handleTelegramCallback);
+
+  telegramBot.on("my_chat_member", async (ctx) => {
+    const update = ctx.update?.my_chat_member;
+    if (!update) return;
+    const newStatus = update.new_chat_member?.status;
+    const oldStatus = update.old_chat_member?.status;
+    if (!["member", "administrator"].includes(newStatus)) return;
+    if (newStatus === oldStatus) return;
+    const chat = update.chat;
+    if (!chat) return;
+    cacheTelegramChat(chat);
+    const inviterId = update.from
+      ? makeUserKey(PLATFORM_TELEGRAM, update.from.id)
+      : null;
+    await promptTelegramChannelListing(chat.id, inviterId, chat.type);
+  });
+
+  telegramBot.command("start", async (ctx) => {
+    if (!isTelegramPrivateChat(ctx)) return;
+    const userId = getTelegramUserKeyFromCtx(ctx);
+    const langInfo = getUserLangInfo(userId);
+    if (!langInfo.explicit && !languagePrompted.has(userId)) {
+      languagePrompted.add(userId);
+      const promptText = t("en", "dm.lang_prompt");
+      await replyToTelegramMessage(ctx, promptText, buildTelegramLangKeyboard());
+      return;
+    }
+    const helpText = withDevHint(
+      t(langInfo.lang, "dm.help_intro_tg"),
+      langInfo.lang,
+      userId
+    );
+    await replyToTelegramMessage(ctx, helpText, buildTelegramDmHelpKeyboard(langInfo.lang));
+  });
+
+  telegramBot.command(["help"], async (ctx) => {
+    if (!isTelegramPrivateChat(ctx)) {
+      const userId = getTelegramUserKeyFromCtx(ctx);
+      const lang = getUserLang(userId);
+      await replyToTelegramMessage(ctx, t(lang, "help.commands"));
+      return;
+    }
+    await handleTelegramPrivateCommand(ctx, "help", []);
+  });
+
+  telegramBot.command("home", async (ctx) => {
+    if (!isTelegramPrivateChat(ctx)) return;
+    await handleTelegramPrivateCommand(ctx, "home", []);
+  });
+
+  telegramBot.command("faq", async (ctx) => {
+    if (!isTelegramPrivateChat(ctx)) return;
+    const args = ctx.message?.text?.split(/\s+/).slice(1) || [];
+    await handleTelegramPrivateCommand(ctx, "faq", args);
+  });
+
+  telegramBot.command("find", async (ctx) => {
+    if (!isTelegramPrivateChat(ctx)) return;
+    await handleTelegramPrivateCommand(ctx, "find", []);
+  });
+
+  telegramBot.command(["mychannels", "my_channels"], async (ctx) => {
+    if (!isTelegramPrivateChat(ctx)) return;
+    await handleTelegramPrivateCommand(ctx, "mychannels", []);
+  });
+
+  telegramBot.command("lang", async (ctx) => {
+    if (!isTelegramPrivateChat(ctx)) return;
+    const args = ctx.message?.text?.split(/\s+/).slice(1) || [];
+    await handleTelegramPrivateCommand(ctx, "lang", args);
+  });
+
+  telegramBot.command("dev", async (ctx) => {
+    if (!isTelegramPrivateChat(ctx)) return;
+    const args = ctx.message?.text?.split(/\s+/).slice(1) || [];
+    await handleTelegramPrivateCommand(ctx, "dev", args);
+  });
+
+  telegramBot.command("whisper", async (ctx) => {
+    if (!isTelegramPrivateChat(ctx)) return;
+    const args = ctx.message?.text?.split(/\s+/).slice(1) || [];
+    await handleTelegramPrivateCommand(ctx, "whisper", args);
+  });
+
+  telegramBot.command("create", async (ctx) => {
+    if (isTelegramPrivateChat(ctx)) return;
+    await handleTelegramGroupCommand(ctx, "create", []);
+  });
+  telegramBot.command("join", async (ctx) => {
+    if (isTelegramPrivateChat(ctx)) return;
+    await handleTelegramGroupCommand(ctx, "join", []);
+  });
+  telegramBot.command("leave", async (ctx) => {
+    if (isTelegramPrivateChat(ctx)) return;
+    await handleTelegramGroupCommand(ctx, "leave", []);
+  });
+  telegramBot.command("start", async (ctx) => {
+    if (isTelegramPrivateChat(ctx)) return;
+    await handleTelegramGroupCommand(ctx, "start", []);
+  });
+  telegramBot.command("extend", async (ctx) => {
+    if (isTelegramPrivateChat(ctx)) return;
+    const args = ctx.message?.text?.split(/\s+/).slice(1) || [];
+    await handleTelegramGroupCommand(ctx, "extend", args);
+  });
+  telegramBot.command("status", async (ctx) => {
+    if (isTelegramPrivateChat(ctx)) return;
+    await handleTelegramGroupCommand(ctx, "status", []);
+  });
+  telegramBot.command("end", async (ctx) => {
+    if (isTelegramPrivateChat(ctx)) return;
+    await handleTelegramGroupCommand(ctx, "end", []);
+  });
+  telegramBot.command("config", async (ctx) => {
+    if (isTelegramPrivateChat(ctx)) return;
+    const args = ctx.message?.text?.split(/\s+/).slice(1) || [];
+    await handleTelegramGroupCommand(ctx, "config", args);
+  });
+
+  telegramBot.on("text", async (ctx) => {
+    if (!isTelegramPrivateChat(ctx)) return;
+    await handleTelegramPrivateText(ctx);
+  });
+
+  if (TELEGRAM_WEBHOOK_DOMAIN) {
+    const hookPath =
+      TELEGRAM_WEBHOOK_PATH.startsWith("/")
+        ? TELEGRAM_WEBHOOK_PATH
+        : `/${TELEGRAM_WEBHOOK_PATH}`;
+    await telegramBot.telegram.setWebhook(`${TELEGRAM_WEBHOOK_DOMAIN}${hookPath}`);
+    await telegramBot.launch({
+      webhook: { domain: TELEGRAM_WEBHOOK_DOMAIN, hookPath, port: PORT },
+    });
+  } else {
+    await telegramBot.launch();
+  }
+
+  console.log("Telegram bot is running.");
+}
+
 function restoreActiveGames() {
   const games = loadAllGames();
   const maintenanceEnabled = isMaintenanceEnabled();
@@ -8908,8 +11727,11 @@ function restoreActiveGames() {
 }
 
 (async () => {
-  await app.start(process.env.PORT || 3000);
+  const useTelegramWebhook = Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_WEBHOOK_DOMAIN);
+  const slackPort = useTelegramWebhook ? SLACK_PORT || 0 : PORT;
+  await app.start(slackPort);
   await initBotIdentity(app.client);
+  await startTelegram();
   restoreActiveGames();
   await maybeNotifyMaintenanceDone(app.client);
   console.log("Mafia bot is running (Socket Mode).");

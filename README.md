@@ -11,7 +11,11 @@
    - Signing Secret
    - App Token (`xapp-...`)
 4. Создайте `.env` на основе `.env.example`.
-5. Установите зависимости и запустите:
+5. Для Telegram создайте бота через @BotFather и получите токен.
+6. Укажите `TELEGRAM_BOT_TOKEN` и, если нужен webhook, `TELEGRAM_WEBHOOK_DOMAIN`, `TELEGRAM_WEBHOOK_PATH`, `PORT`.
+7. Если Telegram работает через webhook, задайте `SLACK_PORT=0` или другой порт, чтобы `PORT` был свободен для Telegram.
+8. Если `TELEGRAM_WEBHOOK_DOMAIN` не задан, Telegram будет работать через polling (удобно локально).
+9. Установите зависимости и запустите:
 
 ```bash
 cd /d E:\my_projects\Mafia Slack Bot
@@ -27,7 +31,7 @@ npm.cmd start
 
 ## Команды
 
-В канале (через упоминание бота):
+Slack в канале (через упоминание бота):
 - `@MafiaBot create` — создать лобби
 - `@MafiaBot join` — войти
 - `@MafiaBot leave` — выйти
@@ -37,7 +41,7 @@ npm.cmd start
 - `@MafiaBot config` — настройки (day/night/lobby/min/extend)
 - `@MafiaBot end` — завершить игру (только хост)
 
-В личке (fallback):
+Slack в личке (fallback):
 - `vote @user` — дневное голосование
 - `kill @user` — мафия
 - `save @user` — доктор
@@ -52,6 +56,24 @@ npm.cmd start
 - Кнопка `Найти игры` в личке — список публичных каналов с играми
 - Кнопка `Мои каналы` в личке — редактирование приватности и настроек по умолчанию
 По умолчанию язык сообщений — English.
+
+Telegram в группах:
+- `/create` — создать лобби
+- `/join` — войти
+- `/leave` — выйти
+- `/start` — начать игру (только хост)
+- `/extend 2` — продлить лобби на 2 минуты
+- `/status` — статус
+- `/config` — настройки (day/night/lobby/min/extend/lang)
+- `/end` — завершить игру (только хост)
+
+Telegram в личке:
+- `/home` — статистика и текущая игра
+- `/faq` — FAQ
+- `/find` — найти игры
+- `/mychannels` — ваши каналы
+- `/lang en|ru` — язык сообщений
+- `/whisper <text>` — анонимный шёпот (1 раз за день)
 
 ## Механика
 
