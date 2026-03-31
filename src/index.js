@@ -589,6 +589,9 @@ const I18N = {
     day: {
       ended_executed: ":day: Voting ended. Executed: {target} ({role})." ,
       ended_tie: ":day: Voting ended. Tie — nobody executed." ,
+      vote_prompt: ":vote: Day has started. Vote in your DM against the player you suspect." ,
+      vote_cast: ":vote: {voter} voted against {target}." ,
+      vote_abstain: ":abstain: {voter} abstained." ,
     },
     auto: {
       applied: ":ok: Auto actions applied." ,
@@ -610,7 +613,7 @@ const I18N = {
       bum: ":bum: Game in {channel}. Who should be visited tonight?" ,
       lawyer: ":lawyer: Game in {channel}. Who should be protected?" ,
       stalker: ":stalker: Contract role: {role}. Who should be killed?" ,
-      day: ":vote: Game in {channel}. Who should be eliminated today?" ,
+      day: ":vote: Game in {channel}. Vote against the player you suspect." ,
     },
     select: {
       player: ":mag_right: Select a player" ,
@@ -1129,6 +1132,9 @@ const I18N = {
     day: {
       ended_executed: ":day: Голосование завершено. Казнен: {target} ({role})." ,
       ended_tie: ":day: Голосование завершено. Ничья, никто не казнен." ,
+      vote_prompt: ":vote: День начался. Проголосуйте в личке против игрока, которого подозреваете." ,
+      vote_cast: ":vote: {voter} проголосовал против {target}." ,
+      vote_abstain: ":abstain: {voter} воздержался." ,
     },
     auto: {
       applied: ":ok: Автодействия применены." ,
@@ -1150,7 +1156,7 @@ const I18N = {
       bum: ":bum: Игра в {channel}. К кому зайти этой ночью?" ,
       lawyer: ":lawyer: Игра в {channel}. Кого прикрыть?" ,
       stalker: ":stalker: Контракт: {role}. Кого устранить?" ,
-      day: ":vote: Игра в {channel}. За кого голосовать сегодня?" ,
+      day: ":vote: Игра в {channel}. Проголосуйте против игрока, которого подозреваете." ,
     },
     select: {
       player: ":mag_right: Выберите игрока" ,
@@ -2773,6 +2779,25 @@ async function getNameOrMention(client, game, userId, lang) {
   return getUserLabel(client, userId);
 }
 
+async function announceDayVote(client, game, voterId, targetId) {
+  const lang = getChannelLangForGame(game);
+  const voter = await getNameOrMention(client, game, voterId, lang);
+  if (targetId === SPECIAL_TARGETS.ABSTAIN) {
+    await announceToChannel(
+      client,
+      game.channelId,
+      t(lang, "day.vote_abstain", { voter })
+    );
+    return;
+  }
+  const target = await getNameOrMention(client, game, targetId, lang);
+  await announceToChannel(
+    client,
+    game.channelId,
+    t(lang, "day.vote_cast", { voter, target })
+  );
+}
+
 async function formatUserListLocalized(client, game, userIds, lang) {
   if (!userIds.length) return "-";
   const names = await Promise.all(
@@ -3501,10 +3526,10 @@ function buildPlayerButtonBlocks({
     blocks.push({
       type: "actions",
       block_id: `pg|${actionId}|${channelId}|${safePage}|extra`,
-      elements: extraButtons.map((button) => ({
+      elements: extraButtons.map((button, idx) => ({
         type: "button",
         text: { type: "plain_text", text: button.text, emoji: false },
-        action_id: button.actionId || actionId,
+        action_id: `${button.actionId || actionId}|extra${idx}`,
         value: button.value,
         style: button.style,
       })),
@@ -3520,7 +3545,7 @@ function buildPlayerButtonBlocks({
       elements: row.map((player) => ({
         type: "button",
         text: { type: "plain_text", text: player.text, emoji: false },
-        action_id: actionId,
+        action_id: `${actionId}|${player.id}`,
         value: player.id,
       })),
     });
@@ -5941,14 +5966,7 @@ function applyAutoNightActions(game) {
 }
 
 function applyAutoDayVotes(game) {
-  const aliveIds = getAlivePlayerIds(game);
-  aliveIds.forEach((voterId) => {
-    if (!game.day.votes[voterId]) {
-      const target =
-        randomChoice(aliveIds.filter((id) => id !== voterId)) || voterId;
-      game.day.votes[voterId] = target;
-    }
-  });
+  // No auto-vote: if a player doesn't vote, their vote is not counted.
 }
 
 function checkWin(game) {
@@ -6194,6 +6212,7 @@ async function startDay(client, game, narrative) {
       : undefined;
     narrativeText = `${baseLine}\n${t(channelLang, narrative.key, params)}`;
   }
+  narrativeText = `${narrativeText}\n${t(channelLang, "day.vote_prompt")}`;
 
   if (isTelegramKey(game.channelId)) {
     await announceToChannel(client, game.channelId, narrativeText);
@@ -6272,15 +6291,6 @@ async function resolveNight(client, game, autoApplied) {
       await recordStalkerLoss(game);
     }
     await requestLastWords(client, game, killedId);
-    const invited = await inviteToGraveyard(client, game, killedId);
-    if (!invited) {
-      await notifyEphemeralLocalized(
-        client,
-        game.channelId,
-        game.hostId,
-        "graveyard.unavailable"
-      );
-    }
   }
 
   await maybePromoteSergeant(client, game);
@@ -6417,15 +6427,6 @@ async function resolveDay(client, game, autoApplied) {
 
   if (executedId) {
     await requestLastWords(client, game, executedId);
-    const invited = await inviteToGraveyard(client, game, executedId);
-    if (!invited) {
-      await notifyEphemeralLocalized(
-        client,
-        game.channelId,
-        game.hostId,
-        "graveyard.unavailable"
-      );
-    }
     if (executedId === game.roles.stalkerId) {
       await recordStalkerLoss(game);
     }
@@ -6498,9 +6499,7 @@ async function autoResolvePhase(client, game) {
   }
 
   if (game.state === "day") {
-    applyAutoDayVotes(game);
-    saveGame(game);
-    await resolveDay(client, game, true);
+    await resolveDay(client, game, false);
   }
 }
 
@@ -6906,10 +6905,12 @@ async function sendDayPromptsTelegram(game) {
 }
 
 function parseActionContext(action) {
-  const actionId = action?.action_id || "";
+  const rawActionId = action?.action_id || "";
+  const baseActionId = rawActionId.split("|")[0];
+  const actionId = baseActionId;
   let channelId = action?.value || null;
   let page = 0;
-  let actionType = actionId;
+  let actionType = baseActionId;
 
   const blockId = action?.block_id || "";
   if (blockId) {
@@ -7652,7 +7653,7 @@ app.action(
 );
 
 app.action(
-  /^(day_vote|mafia_vote|doctor_save|detective_check|detective_kill|bodyguard_protect|bum_visit|lawyer_protect|stalker_kill)$/,
+  /^(day_vote|mafia_vote|doctor_save|detective_check|detective_kill|bodyguard_protect|bum_visit|lawyer_protect|stalker_kill)(\|.*)?$/,
   async ({ ack, body, action, client }) => {
     await ack();
 
@@ -7714,21 +7715,23 @@ app.action(
         }
         game.day.votes[actorId] = targetId;
         saveGame(game);
-        if (targetId === SPECIAL_TARGETS.ABSTAIN) {
-          await updateActionMessage(
-            client,
-            body,
-            t(actorLang, "action.vote_abstain")
-          );
-        } else {
-          await updateActionMessage(
-            client,
-            body,
-            t(actorLang, "action.vote_recorded", {
-              target: mention(targetId),
-            })
-          );
-        }
+      if (targetId === SPECIAL_TARGETS.ABSTAIN) {
+        await updateActionMessage(
+          client,
+          body,
+          t(actorLang, "action.vote_abstain")
+        );
+        await announceDayVote(client, game, actorId, SPECIAL_TARGETS.ABSTAIN);
+      } else {
+        await updateActionMessage(
+          client,
+          body,
+          t(actorLang, "action.vote_recorded", {
+            target: mention(targetId),
+          })
+        );
+        await announceDayVote(client, game, actorId, targetId);
+      }
 
         if (maybeShortenPhase(game, "day")) {
           await announceToChannelLocalized(client, game, "warn.shortened_day");
@@ -9452,38 +9455,40 @@ app.event("message", async ({ event, client }) => {
           });
           return;
         }
-        if (actionKey === "abstain" || restClean.trim().toLowerCase() === "abstain") {
-          if (!current.config.allowAbstain) {
-            await client.chat.postMessage({
-              channel: event.channel,
-              text: t(userLang, "action.abstain_disabled"),
-            });
-            return;
-          }
-          current.day.votes[actorId] = SPECIAL_TARGETS.ABSTAIN;
-          saveGame(current);
+      if (actionKey === "abstain" || restClean.trim().toLowerCase() === "abstain") {
+        if (!current.config.allowAbstain) {
           await client.chat.postMessage({
             channel: event.channel,
-            text: t(userLang, "action.vote_abstain"),
+            text: t(userLang, "action.abstain_disabled"),
           });
-        } else {
-          const targetId = resolveTargetIdFromText(current, restClean);
-          if (!targetId || !isPlayerAlive(current, targetId)) {
-            await client.chat.postMessage({
-              channel: event.channel,
-              text: t(userLang, "dm_cmd.need_alive"),
-            });
-            return;
-          }
-          current.day.votes[actorId] = targetId;
-          saveGame(current);
-          await client.chat.postMessage({
-            channel: event.channel,
-            text: t(userLang, "dm_cmd.vote_recorded", {
-              target: mention(targetId),
-            }),
-          });
+          return;
         }
+        current.day.votes[actorId] = SPECIAL_TARGETS.ABSTAIN;
+        saveGame(current);
+        await client.chat.postMessage({
+          channel: event.channel,
+          text: t(userLang, "action.vote_abstain"),
+        });
+        await announceDayVote(client, current, actorId, SPECIAL_TARGETS.ABSTAIN);
+      } else {
+        const targetId = resolveTargetIdFromText(current, restClean);
+        if (!targetId || !isPlayerAlive(current, targetId)) {
+          await client.chat.postMessage({
+            channel: event.channel,
+            text: t(userLang, "dm_cmd.need_alive"),
+          });
+          return;
+        }
+        current.day.votes[actorId] = targetId;
+        saveGame(current);
+        await client.chat.postMessage({
+          channel: event.channel,
+          text: t(userLang, "dm_cmd.vote_recorded", {
+            target: mention(targetId),
+          }),
+        });
+        await announceDayVote(client, current, actorId, targetId);
+      }
         if (maybeShortenPhase(current, "day")) {
           await announceToChannelLocalized(client, current, "warn.shortened_day");
           await postOrUpdateDashboard(client, current);
@@ -9970,6 +9975,7 @@ app.event("message", async ({ event, client }) => {
           target: mention(targetId),
         }),
       });
+      await announceDayVote(client, game, userId, targetId);
       if (maybeShortenPhase(game, "day")) {
         await announceToChannelLocalized(client, game, "warn.shortened_day");
         await postOrUpdateDashboard(client, game);
@@ -10543,6 +10549,7 @@ async function handleTelegramPlayerAction(ctx, data) {
           ? t(actorLang, "action.vote_abstain")
           : t(actorLang, "action.vote_recorded", { target: mention(targetId) });
       await updateTelegramActionMessage(ctx, text, undefined);
+      await announceDayVote(null, game, actorId, targetId);
 
       if (maybeShortenPhase(game, "day")) {
         await announceToChannelLocalized(null, game, "warn.shortened_day");
