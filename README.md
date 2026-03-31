@@ -1,28 +1,23 @@
 ﻿# Mafia Slack Bot
 
-Полноценный мафия-бот для Slack (Socket Mode) с анонимными голосованиями, таймерами и сохранением состояния в Postgres (Render) или SQLite (локально).
+Full-featured Mafia bot for Slack (Socket Mode) with anonymous voting, timers, and state persistence in Postgres (Render) or SQLite (local).
 
-## Быстрый старт
+## Quick Start
 
-1. Создайте Slack App из `manifest.json`.
-2. Включите Socket Mode и создайте app-level token с правом `connections:write`.
-3. Установите приложение в workspace и возьмите:
+1. Create a Slack App from `manifest.json`.
+2. Enable Socket Mode and create an app-level token with `connections:write`.
+3. Install the app in your workspace and copy:
    - Bot Token (`xoxb-...`)
    - Signing Secret
    - App Token (`xapp-...`)
-4. Создайте `.env` на основе `.env.example`.
-5. Для Render подключите Postgres и укажите `DATABASE_URL` (и `PGSSL=1`).
-6. Для Telegram создайте бота через @BotFather и получите токен.
-7. Укажите `TELEGRAM_BOT_TOKEN` и, если нужен webhook, `TELEGRAM_WEBHOOK_DOMAIN`, `TELEGRAM_WEBHOOK_PATH`, `PORT`.
-8. Если Telegram работает через webhook, задайте `SLACK_PORT=0` или другой порт, чтобы `PORT` был свободен для Telegram.
-9. Если `TELEGRAM_WEBHOOK_DOMAIN` не задан, Telegram будет работать через polling (удобно локально).
-10. Установите зависимости и запустите:
+4. Create `.env` from `.env.example`.
+5. For Render, attach Postgres and set `DATABASE_URL` (and `PGSSL=1`).
+6. For Telegram, create a bot via @BotFather and get a token.
+7. Set `TELEGRAM_BOT_TOKEN` and, if using webhook, `TELEGRAM_WEBHOOK_DOMAIN`, `TELEGRAM_WEBHOOK_PATH`, `PORT`.
+8. If Telegram uses webhook, set `SLACK_PORT=0` (or another port) so `PORT` stays free for Telegram.
+9. If `TELEGRAM_WEBHOOK_DOMAIN` is not set, Telegram runs in polling (good for local dev).
+10. Install deps and run:
 
-```bash
-cd /d E:\my_projects\Mafia Slack Bot
-npm.cmd start
-
-```
 
 ```bash
 npm install
@@ -30,132 +25,264 @@ npm start
 npm.cmd start
 ```
 
-Примечание: в режиме polling бот поднимает health‑server на `PORT`, чтобы Render видел открытый порт.
+Note: in polling mode the bot starts a health server on `PORT` so Render sees an open port.
 
-## Команды
+## Day/Night media and Home icon
 
-Slack в канале (через упоминание бота):
-- `@MafiaBot create` — создать лобби
-- `@MafiaBot join` — войти
-- `@MafiaBot leave` — выйти
-- `@MafiaBot start` — начать игру (только хост)
-- `@MafiaBot extend 2` — продлить лобби на 2 минуты
-- `@MafiaBot status` — статус
-- `@MafiaBot config` — настройки (day/night/lobby/min/extend)
-- `@MafiaBot end` — завершить игру (только хост)
+- Day/Night MP4 in the channel requires the `files:write` scope and app reinstall.
+- Home icon requires public access to assets:
+  - Set `ASSET_BASE_URL=https://<your-domain>` (e.g., your Render domain).
+  - The bot serves `/assets/*` via the health server (PORT).
+- If `ASSET_BASE_URL` is not set, Home icons are hidden (text only).
 
-Slack в личке (fallback):
-- `vote @user` — дневное голосование
-- `kill @user` — мафия
-- `save @user` — доктор
-- `check @user` — детектив
-- `protect @user` — телохранитель
-- `whisper <text>` — анонимный шёпот (1 раз за день)
-- `lang en` / `lang ru` — язык сообщений
-- `mychannels` — список ваших каналов и настройки
-- `faq` / `faq <id>` — открыть FAQ (список или конкретный вопрос)
-- `dev <code>` — открыть Dev‑панель (только для DEV_USER_ID)
-- Любое сообщение в личке — инструкция по добавлению и запуску
-- Кнопка `Найти игры` в личке — список публичных каналов с играми
-- Кнопка `Мои каналы` в личке — редактирование приватности и настроек по умолчанию
-По умолчанию язык сообщений — English.
+## Beginner Guide (step by step)
 
-Telegram в группах:
-- `/create` — создать лобби
-- `/join` — войти
-- `/leave` — выйти
-- `/start` — начать игру (только хост)
-- `/extend 2` — продлить лобби на 2 минуты
-- `/status` — статус
-- `/config` — настройки (day/night/lobby/min/extend/lang)
-- `/end` — завершить игру (только хост)
+### 1) Install requirements
+- Install Node.js (LTS).
+- Open terminal in project folder.
 
-Telegram в личке:
-- `/home` — статистика и текущая игра
+### 2) Install dependencies
+```bash
+npm install
+```
+
+### 3) Create Slack App (from manifest)
+1. Go to Slack API → **Create App** → **From an app manifest**.
+2. Paste contents of `manifest.json`.
+3. Install the app to your workspace.
+
+### 4) Get Slack tokens
+From your app settings:
+- **Bot Token** (`xoxb-...`)
+- **App Token** (`xapp-...`) with `connections:write`
+- **Signing Secret**
+
+Put them into `.env`.
+
+Where to find them in Slack App settings:
+- **Bot Token**: App → **OAuth & Permissions** → “Bot User OAuth Token”.
+- **Signing Secret**: App → **Basic Information** → “App Credentials”.
+- **App Token**: App → **Socket Mode** → “Generate an app-level token” (scope `connections:write`).
+
+### 5) Start locally
+```bash
+npm start
+```
+You should see logs that Socket Mode is connected.
+
+### 6) Add bot to a channel
+In Slack channel:
+```
+/invite @MafiaBot
+```
+
+### 7) Create a lobby
+In the channel:
+```
+@MafiaBot create
+```
+Players join with `Join` and host starts with `Start`.
+
+### 8) Update scopes / reinstall
+If you changed `manifest.json` (added scopes), **reinstall** the app in Slack.
+
+### 9) Render (production)
+1. Create a Render Web Service.
+2. Add environment variables (from `.env`).
+3. Add Postgres and set:
+   - `DATABASE_URL`
+   - `PGSSL=1`
+4. Deploy.
+
+Where to find `DATABASE_URL` in Render:
+- Render → **PostgreSQL** → your DB → **Info** → “Internal Database URL”.
+- Use the **Internal Database URL** for Render services (more reliable and no public firewall issues).
+
+### 9.1) Prevent Render sleep (optional)
+If you are on a free plan, Render may sleep without traffic.
+Enable keep‑alive ping:
+- Set `KEEP_ALIVE_URL` to your service URL.
+- Optional: `KEEP_ALIVE_INTERVAL_MINUTES` (default 10).
+
+Note: keep‑alive helps but free plans may still sleep. Paid plans are the only guaranteed option.
+
+### 10) Assets (Home icon + day/night media)
+- Set `ASSET_BASE_URL=https://<your-domain>` so Slack can load images.
+- Ensure `files:write` scope for day/night MP4.
+
+Where to find `ASSET_BASE_URL`:
+- Render → your Web Service → **Settings** → “Service URL”  
+  Example: `https://your-service.onrender.com`
+
+### 11) Telegram webhook (optional)
+If you use Telegram webhook:
+- `TELEGRAM_WEBHOOK_DOMAIN` = your service URL (Render Service URL)
+- `TELEGRAM_WEBHOOK_PATH` = `/telegram` (default)
+- `PORT` must be open for webhook
+
+If you leave `TELEGRAM_WEBHOOK_DOMAIN` empty, Telegram will use polling (local dev friendly).
+
+## Project Management (for beginners)
+
+### How to start/stop the bot
+- Start: `npm start`
+- Stop: `Ctrl + C`
+
+### Where data is stored
+- **Local**: `data/mafia.db` (SQLite)
+- **Render**: Postgres via `DATABASE_URL`
+
+### Reset the database (local)
+Stop the bot, then delete:
+```
+data/mafia.db
+```
+
+### Update dependencies
+```
+npm install
+```
+
+### Typical workflow
+1. Change code.
+2. Restart `npm start`.
+3. Reinstall Slack app if scopes changed.
+
+### Useful logs
+If something doesn’t work, check terminal logs:
+- Slack connection status
+- Telegram webhook/polling status
+- Database connection errors
+
+### Common issues
+- **Bot can’t DM**: Slack settings may block app messages.
+- **Buttons don’t work**: Ensure Interactivity is enabled in Slack app.
+- **Home tab empty**: Open Home again or check logs.
+- **Files (day/night) not posted**: Ensure `files:write` + reinstall app.
+
+## Commands
+
+Slack in channel (mention the bot):
+- `@MafiaBot create` — create lobby
+- `@MafiaBot join` — join
+- `@MafiaBot leave` — leave
+- `@MafiaBot start` — start game (host only)
+- `@MafiaBot extend 2` — extend lobby by 2 minutes
+- `@MafiaBot status` — status
+- `@MafiaBot config` — settings (day/night/lobby/min/extend)
+- `@MafiaBot end` — end game (host only)
+
+Slack in DM (fallback):
+- `vote @user` — day vote
+- `kill @user` — mafia kill
+- `save @user` — doctor
+- `check @user` — detective
+- `protect @user` — bodyguard
+- `whisper <text>` — anonymous whisper (once per day)
+- `lang en` / `lang ru` — language
+- `mychannels` — your channels + defaults
+- `faq` / `faq <id>` — FAQ list or a specific answer
+- `dev <code>` — Dev panel (DEV_USER_ID only)
+- Any DM — onboarding instructions
+- `Find games` button in DM — public game list
+- `My channels` button in DM — edit privacy and defaults
+Default language is English.
+
+Telegram in groups:
+- `/create` — create lobby
+- `/join` — join
+- `/leave` — leave
+- `/start` — start game (host only)
+- `/extend 2` — extend lobby by 2 minutes
+- `/status` — status
+- `/config` — settings (day/night/lobby/min/extend/lang)
+- `/end` — end game (host only)
+
+Telegram in DM:
+- `/home` — stats + current game
 - `/faq` — FAQ
-- `/find` — найти игры
-- `/mychannels` — ваши каналы
-- `/lang en|ru` — язык сообщений
-- `/whisper <text>` — анонимный шёпот (1 раз за день)
+- `/find` — find games
+- `/mychannels` — your channels
+- `/lang en|ru` — language
+- `/whisper <text>` — anonymous whisper (once per day)
 
-## Механика
+## Mechanics
 
-- Минимум 4 игрока: мафия, доктор, детектив, мирный.
-- Доп. роли:
-  - `>=7` игроков — мэр (двойной голос).
-  - `>=8` игроков — телохранитель (перехватывает удар).
-- Дневные и ночные действия приходят в личку как интерактивные сообщения.
-- В лобби есть панель с кнопками `Join`, `Leave`, `Start`, `Ready`, `Extend`, `End`.
-- Таймеры: по умолчанию лобби 5 мин, день 5 мин, ночь 2 мин; есть предупреждения и автодействия.
-- Выбывшие игроки не могут писать в канал игры (сообщения удаляются).
-- Последние слова: после смерти бот просит DM, сообщение публикуется в канал.
-- Есть пин‑сообщение Game Dashboard (фаза/таймер/живые).
-- Состояние хранится в Postgres (Render) или SQLite (`data/mafia.db`) при локальном запуске без `DATABASE_URL`.
+- Minimum 4 players: mafia, doctor, detective, town.
+- Extra roles:
+  - `>=7` players — mayor (double vote)
+  - `>=8` players — bodyguard (takes the hit)
+- Day/night actions are delivered via interactive DMs.
+- Lobby panel has buttons `Join`, `Leave`, `Start`, `Ready`, `Extend`, `End`.
+- Timers: lobby 5m, day 5m, night 2m by default; warnings + auto actions.
+- Eliminated players can’t speak in game channel (messages are deleted).
+- Last words: after death bot asks for a DM and posts it to the channel.
+- Game Dashboard is pinned (phase/timer/alive).
+- State is stored in Postgres (Render) or SQLite (`data/mafia.db`) locally when `DATABASE_URL` is absent.
 
 ## Render + Postgres
 
-1. В Render создайте Postgres (Managed DB).
-2. В настройках сервиса добавьте:
-   - `DATABASE_URL` (строка подключения из Render)
+1. Create Render Postgres (Managed DB).
+2. Add in service env:
+   - `DATABASE_URL` (Render connection string)
    - `PGSSL=1`
-3. Перезапустите сервис.  
-   Бот автоматически перейдёт на Postgres и будет сохранять данные между деплоями.
+3. Redeploy. The bot will use Postgres and persist data between deploys.
 
-## Публичные каналы и «Найти игры»
+## Public Channels and Find Games
 
-- При добавлении бота в канал он спросит в личке, делать ли канал публичным в каталоге игр.
-- Если личка недоступна, бот спросит в самом канале.
-- Если ничего не пришло, упомяните бота в канале (например `@MafiaBot help`) — он повторит вопрос.
-- В личке нажмите кнопку `Найти игры`, чтобы открыть список:
-  - Фильтры: «Активные», «В наборе», «Не активные»
-  - Пагинация: кнопки `Prev` / `Next`
-- Приватные каналы не попадают в список.
+- When the bot is invited, it asks whether the channel should be listed in Find Games.
+- If DM is blocked, it asks in the channel.
+- If nothing arrived, mention the bot in the channel (e.g. `@MafiaBot help`) to re-trigger.
+- In DM press `Find games` to open the list:
+  - Filters: Active / Recruiting / Inactive
+  - Pagination: Prev / Next
+- Private channels are not listed.
 
-## Мои каналы
+## My Channels
 
-- В личке нажмите кнопку `Мои каналы`.
-- Появится список каналов, где вы последний меняли приватность.
-- Нажмите на канал, чтобы отредактировать приватность и дефолтные параметры игры.
-- Рядом с настройками есть кнопки `?`, которые открывают связанный FAQ‑ответ.
+- In DM press `My channels`.
+- You’ll see channels where you last changed privacy.
+- Click a channel to edit privacy and default settings.
+- Settings have “?” buttons that open the relevant FAQ answer.
 
 ## FAQ
 
-- В личке есть кнопка `FAQ` — откроется модалка со списком вопросов.
-- В ответах показывается ID: `faq <id>` — можно открыть конкретный вопрос через команду.
+- In DM press `FAQ` to open the list.
+- Answers show ID: `faq <id>` — open a specific question via command.
 
-## Dev‑режим и обновление
+## Dev Mode and Maintenance
 
-- В `.env` можно указать `DEV_USER_ID` и `DEV_CODE`.
-- В личке напишите `dev <code>` — откроется Dev‑панель.
-- Кнопка `Enable maintenance` включает режим обновления:
-  - Новые лобби и игры блокируются.
-  - Все лобби автоматически закрываются.
-  - Активные игры доигрываются.
-  - Когда последняя игра завершится — бот напишет девелоперу в личку.
-- Кнопка `Disable maintenance` отключает режим обновления.
+- Set `DEV_USER_ID` and `DEV_CODE` in `.env`.
+- In DM run `dev <code>` to open the Dev panel.
+- `Enable maintenance`:
+  - New lobbies and games are blocked.
+  - All lobbies close immediately.
+  - Active games finish.
+  - Dev gets a DM when the last game ends.
+- `Disable maintenance` turns it off.
 
-## Тест‑режим (один аккаунт)
+## Test Mode (single account)
 
-Только для `DEV_USER_ID`. Позволяет создать виртуальных игроков и управлять ими через DM.
+DEV only. Create virtual players and control them from DM.
 
-- Создать тест‑лобби:  
+- Create test lobby:
   `test setup #channel Alice,Bob,Charlie`
-- Управление действиями:  
-  `as Alice vote Bob`  
-  `as Alice kill Bob`  
-  `as Alice save Bob`  
-  `as Alice check Bob`  
-  `as Alice protect Bob`  
-  `as Alice whisper <text>`  
+- Actions:
+  `as Alice vote Bob`
+  `as Alice kill Bob`
+  `as Alice save Bob`
+  `as Alice check Bob`
+  `as Alice protect Bob`
+  `as Alice whisper <text>`
   `as Alice abstain`
-- Список тест‑игроков:  
+- List:
   `test list #channel`
 
-Примечания:
-- Тест‑игроки не получают DM‑сообщения и не учитываются в статистике.
-- Имена должны быть одним словом (без пробелов).
+Notes:
+- Test players don’t receive DMs and don’t count toward stats.
+- Names must be one word (no spaces).
 
-## Важно про scopes
+## Scopes
 
-Если вы обновили `manifest.json`, переустановите приложение, чтобы обновить выданные права.
-Для новых функций нужны дополнительные права (`pins:write`, `groups:write`, `mpim:write`, `channels:read`, `groups:read`).
+If you updated `manifest.json`, reinstall the app to refresh permissions.
+Required scopes for new features: `pins:write`, `groups:write`, `mpim:write`, `channels:read`, `groups:read`, `files:write`.

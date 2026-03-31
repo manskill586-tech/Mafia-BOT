@@ -39,6 +39,12 @@ const DEV_CODE = process.env.DEV_CODE || "";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const TELEGRAM_WEBHOOK_DOMAIN = process.env.TELEGRAM_WEBHOOK_DOMAIN || "";
 const TELEGRAM_WEBHOOK_PATH = process.env.TELEGRAM_WEBHOOK_PATH || "/telegram";
+const ASSET_BASE_URL = (process.env.ASSET_BASE_URL || process.env.RENDER_EXTERNAL_URL || "")
+  .trim()
+  .replace(/\/+$/, "");
+const KEEP_ALIVE_URL = (process.env.KEEP_ALIVE_URL || "").trim();
+const KEEP_ALIVE_INTERVAL_MINUTES =
+  Number(process.env.KEEP_ALIVE_INTERVAL_MINUTES) || 10;
 const PORT = Number(process.env.PORT) || 3000;
 const SLACK_PORT = Number(process.env.SLACK_PORT);
 const BUTTON_PAGE_SIZE = 10;
@@ -56,6 +62,14 @@ const SPECIAL_TARGETS = {
 const TEST_ID_PREFIX = "test:";
 const PLATFORM_SLACK = "slack";
 const PLATFORM_TELEGRAM = "tg";
+const ASSETS_DIR = path.join(__dirname, "..", "assets");
+const ASSET_FILES = {
+  mafia: "Mafia.jpg",
+  peace: "Peace.jpg",
+  icon: "icon.jpg",
+  day: "day.mp4",
+  night: "night.mp4",
+};
 
 const LANGS = ["en", "ru"];
 const DEFAULT_LANG = "en";
@@ -75,13 +89,82 @@ function startHealthServer() {
   if (healthServer) return;
   if (!Number.isFinite(PORT) || PORT <= 0) return;
   healthServer = http.createServer((req, res) => {
-    res.statusCode = 200;
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.end("OK");
+    try {
+      const url = new URL(req.url || "/", "http://localhost");
+      if (url.pathname.startsWith("/assets/")) {
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          res.statusCode = 405;
+          res.end("Method Not Allowed");
+          return;
+        }
+        const fileName = path.basename(url.pathname);
+        const filePath = path.join(ASSETS_DIR, fileName);
+        if (!filePath.startsWith(ASSETS_DIR)) {
+          res.statusCode = 403;
+          res.end("Forbidden");
+          return;
+        }
+        if (!fs.existsSync(filePath)) {
+          res.statusCode = 404;
+          res.end("Not Found");
+          return;
+        }
+        const ext = path.extname(filePath).toLowerCase();
+        const contentType =
+          ext === ".jpg" || ext === ".jpeg"
+            ? "image/jpeg"
+            : ext === ".png"
+            ? "image/png"
+            : ext === ".mp4"
+            ? "video/mp4"
+            : "application/octet-stream";
+        res.statusCode = 200;
+        res.setHeader("Content-Type", contentType);
+        if (req.method === "HEAD") {
+          res.end();
+          return;
+        }
+        fs.createReadStream(filePath).pipe(res);
+        return;
+      }
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.end("OK");
+    } catch (err) {
+      res.statusCode = 500;
+      res.end("Server Error");
+    }
   });
   healthServer.listen(PORT, () => {
     console.log(`Health server listening on port ${PORT}.`);
   });
+}
+
+function startKeepAlive() {
+  if (!KEEP_ALIVE_URL) return;
+  let url;
+  try {
+    url = new URL(KEEP_ALIVE_URL);
+  } catch {
+    console.warn("KEEP_ALIVE_URL is invalid. Skipping keep-alive.");
+    return;
+  }
+  const intervalMs = Math.max(1, KEEP_ALIVE_INTERVAL_MINUTES) * 60 * 1000;
+  const lib = url.protocol === "https:" ? require("https") : require("http");
+  const ping = () => {
+    try {
+      const req = lib.request(url, { method: "GET" }, (res) => {
+        res.resume();
+      });
+      req.on("error", () => {});
+      req.end();
+    } catch {
+      // ignore
+    }
+  };
+  ping();
+  setInterval(ping, intervalMs).unref?.();
+  console.log(`Keep-alive enabled: ${KEEP_ALIVE_URL} every ${KEEP_ALIVE_INTERVAL_MINUTES} min.`);
 }
 
 function parsePlatformKey(key) {
@@ -462,6 +545,7 @@ const I18N = {
       players: ":alive: Players: {count}/{min}" ,
       ready: ":ready: Ready: {ready}/{total}" ,
       start_in: ":timer: Starts in: {time}" ,
+      player_list: ":card_index_dividers: Party: {list}" ,
       created:
         ":recruiting: Lobby created. Host: {host}. Join with `@MafiaBot join` or the button." ,
       joined: ":recruiting: {user} joined. Players: {count}" ,
@@ -491,8 +575,11 @@ const I18N = {
       text: ":warn: Reminder: finish {action} for the game in {channel}." ,
     },
     phase: {
-      night_start: ":phase: Night {round}. The city falls asleep..." ,
-      day_start: ":phase: Day {round}. The city wakes up..." ,
+      night_start: ":night: Night {round}. The city falls silent as shadows move..." ,
+      day_start: ":day: Day {round}. The city wakes to whispers and suspicion..." ,
+      card_title_night: ":night: Night {round}" ,
+      card_title_day: ":day: Day {round}" ,
+      card_stats: ":alive: Alive {alive} • :timer: {time}" ,
     },
     night: {
       ended_killed: ":night: Night is over. Killed: {targets}." ,
@@ -998,6 +1085,7 @@ const I18N = {
       players: ":alive: Игроки: {count}/{min}" ,
       ready: ":ready: Готовы: {ready}/{total}" ,
       start_in: ":timer: Старт через: {time}" ,
+      player_list: ":card_index_dividers: Состав: {list}" ,
       created:
         ":recruiting: Создано лобби. Хост: {host}. Присоединяйтесь через `@MafiaBot join` или кнопку." ,
       joined: ":recruiting: {user} присоединился. Игроков: {count}" ,
@@ -1027,8 +1115,11 @@ const I18N = {
       text: ":warn: Напоминание: завершите {action} для игры в {channel}." ,
     },
     phase: {
-      night_start: ":phase: Ночь {round}. Город засыпает..." ,
-      day_start: ":phase: День {round}. Город просыпается..." ,
+      night_start: ":night: Ночь {round}. Город замирает, и тени оживают..." ,
+      day_start: ":day: День {round}. Город просыпается в тревоге и шёпоте..." ,
+      card_title_night: ":night: Ночь {round}" ,
+      card_title_day: ":day: День {round}" ,
+      card_stats: ":alive: Живые {alive} • :timer: {time}" ,
     },
     night: {
       ended_killed: ":night: Ночь окончена. Убиты: {targets}." ,
@@ -2686,6 +2777,19 @@ async function formatUserListPlain(client, userIds) {
   return names.join(", ");
 }
 
+function getAssetUrl(fileName) {
+  if (!ASSET_BASE_URL) return "";
+  return `${ASSET_BASE_URL}/assets/${fileName}`;
+}
+
+function getHomeIconFile(game, userId) {
+  if (!game || !userId) return ASSET_FILES.icon;
+  const role = game.players?.[userId]?.role;
+  if (!role) return ASSET_FILES.icon;
+  if (isMafiaTeam(game, userId)) return ASSET_FILES.mafia;
+  return ASSET_FILES.peace;
+}
+
 async function listAliveDisplay(client, game, lang) {
   return formatUserListLocalized(client, game, getAlivePlayerIds(game), lang);
 }
@@ -3372,6 +3476,10 @@ function buildPlayerButtonBlocks({
       type: "section",
       text: { type: "mrkdwn", text },
     },
+    {
+      type: "context",
+      elements: [{ type: "mrkdwn", text: t(lang, "select.target") }],
+    },
   ];
 
   if (extraButtons && extraButtons.length) {
@@ -3536,15 +3644,34 @@ function getUserCurrentGame(userId) {
 }
 
 async function buildHomeBlocksDetailed(client, userId, lang) {
+  const game = getUserCurrentGame(userId);
+  const iconFile = getHomeIconFile(game, userId);
+  const iconUrl = getAssetUrl(iconFile);
+  const iconAlt =
+    iconFile === ASSET_FILES.mafia
+      ? "Mafia"
+      : iconFile === ASSET_FILES.peace
+      ? "Peace"
+      : "MafiaBot";
+
+  const taglineBlock = {
+    type: "section",
+    text: { type: "mrkdwn", text: t(lang, "home.tagline") },
+  };
+  if (iconUrl) {
+    taglineBlock.accessory = {
+      type: "image",
+      image_url: iconUrl,
+      alt_text: iconAlt,
+    };
+  }
+
   const blocks = [
     {
       type: "header",
       text: { type: "plain_text", text: t(lang, "home.title") },
     },
-    {
-      type: "section",
-      text: { type: "mrkdwn", text: t(lang, "home.tagline") },
-    },
+    taglineBlock,
     { type: "divider" },
   ];
 
@@ -3582,7 +3709,6 @@ async function buildHomeBlocksDetailed(client, userId, lang) {
     },
   });
 
-  const game = getUserCurrentGame(userId);
   if (!game) {
     blocks.push({
       type: "section",
@@ -3808,8 +3934,7 @@ async function buildLobbyBlocks(client, game, lang) {
       ? formatDuration(lang, game.phaseDeadline - now())
       : "-";
 
-  const text =
-    `*${t(lang, "lobby.title")}*\n` +
+  const summaryText =
     `${t(lang, "lobby.host", {
       host: await getNameOrMention(client, game, game.hostId, lang),
     })}\n` +
@@ -3821,13 +3946,25 @@ async function buildLobbyBlocks(client, game, lang) {
       ready: readyCount,
       total: playerIds.length,
     })}\n` +
-    `${playerList}\n` +
     `${t(lang, "lobby.start_in", { time: remaining })}`;
 
   return [
     {
+      type: "header",
+      text: { type: "plain_text", text: t(lang, "lobby.title") },
+    },
+    {
       type: "section",
-      text: { type: "mrkdwn", text },
+      text: { type: "mrkdwn", text: summaryText },
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: t(lang, "lobby.player_list", { list: playerList }),
+        },
+      ],
     },
     {
       type: "actions",
@@ -5318,6 +5455,86 @@ async function announceToChannel(client, channelId, text) {
   await client.chat.postMessage({ channel: stripPlatformPrefix(channelId), text });
 }
 
+function buildPhaseCardText(game, phase, narrativeText, lang) {
+  const title =
+    phase === "day"
+      ? t(lang, "phase.card_title_day", { round: game.round })
+      : t(lang, "phase.card_title_night", { round: game.round });
+  const alive = getAlivePlayerIds(game).length;
+  const remaining =
+    game.phaseDeadline !== null
+      ? formatDuration(lang, game.phaseDeadline - now())
+      : "-";
+  const stats = t(lang, "phase.card_stats", {
+    alive,
+    time: remaining,
+  });
+  return `${title}\n${narrativeText}\n${stats}`;
+}
+
+function buildPhaseCardBlocks(game, phase, narrativeText, lang) {
+  const title =
+    phase === "day"
+      ? t(lang, "phase.card_title_day", { round: game.round })
+      : t(lang, "phase.card_title_night", { round: game.round });
+  const alive = getAlivePlayerIds(game).length;
+  const remaining =
+    game.phaseDeadline !== null
+      ? formatDuration(lang, game.phaseDeadline - now())
+      : "-";
+  const stats = t(lang, "phase.card_stats", {
+    alive,
+    time: remaining,
+  });
+  return [
+    {
+      type: "header",
+      text: { type: "plain_text", text: title },
+    },
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: narrativeText },
+    },
+    {
+      type: "context",
+      elements: [{ type: "mrkdwn", text: stats }],
+    },
+  ];
+}
+
+async function postPhaseCard(client, game, phase, narrativeText) {
+  const lang = getChannelLangForGame(game);
+  const blocks = buildPhaseCardBlocks(game, phase, narrativeText, lang);
+  const text = buildPhaseCardText(game, phase, narrativeText, lang);
+  const res = await client.chat.postMessage({
+    channel: stripPlatformPrefix(game.channelId),
+    text,
+    blocks,
+  });
+  return res?.ts || null;
+}
+
+async function postPhaseMedia(client, game, phase, narrativeText, threadTs) {
+  const fileName = phase === "day" ? ASSET_FILES.day : ASSET_FILES.night;
+  const filePath = path.join(ASSETS_DIR, fileName);
+  if (!fs.existsSync(filePath)) return false;
+  try {
+    const initialComment = threadTs ? undefined : narrativeText;
+    await client.files.uploadV2({
+      channel_id: stripPlatformPrefix(game.channelId),
+      file: fs.createReadStream(filePath),
+      filename: fileName,
+      title: phase === "day" ? "Day" : "Night",
+      initial_comment: initialComment,
+      thread_ts: threadTs || undefined,
+    });
+    return true;
+  } catch (err) {
+    console.error("Failed to upload phase media:", err?.data || err);
+    return false;
+  }
+}
+
 async function announceToChannelLocalized(
   client,
   game,
@@ -5895,14 +6112,29 @@ async function startNight(client, game, narrative) {
   saveGame(game);
   schedulePhaseTimers(game);
 
+  const channelLang = getChannelLangForGame(game);
+  const baseLine = t(channelLang, "phase.night_start", { round: game.round });
+  let narrativeText = baseLine;
   if (narrative?.text) {
-    await announceToChannel(client, game.channelId, narrative.text);
-  } else if (narrative) {
-    await announceToChannelLocalized(client, game, narrative.key, narrative.paramsBuilder);
+    narrativeText = `${baseLine}\n${narrative.text}`;
+  } else if (narrative?.key) {
+    const params = narrative.paramsBuilder
+      ? await narrative.paramsBuilder(channelLang)
+      : undefined;
+    narrativeText = `${baseLine}\n${t(channelLang, narrative.key, params)}`;
+  }
+
+  if (isTelegramKey(game.channelId)) {
+    await announceToChannel(client, game.channelId, narrativeText);
   } else {
-    await announceToChannelLocalized(client, game, "phase.night_start", () => ({
-      round: game.round,
-    }));
+    let cardTs = null;
+    try {
+      cardTs = await postPhaseCard(client, game, "night", narrativeText);
+    } catch (err) {
+      console.error("Failed to post night card:", err?.data || err);
+      await announceToChannel(client, game.channelId, narrativeText);
+    }
+    await postPhaseMedia(client, game, "night", narrativeText, cardTs);
   }
 
   if (game.roles.stalkerId && !game.stalker?.targetRole) {
@@ -5935,14 +6167,29 @@ async function startDay(client, game, narrative) {
   saveGame(game);
   schedulePhaseTimers(game);
 
+  const channelLang = getChannelLangForGame(game);
+  const baseLine = t(channelLang, "phase.day_start", { round: game.round });
+  let narrativeText = baseLine;
   if (narrative?.text) {
-    await announceToChannel(client, game.channelId, narrative.text);
-  } else if (narrative) {
-    await announceToChannelLocalized(client, game, narrative.key, narrative.paramsBuilder);
+    narrativeText = `${baseLine}\n${narrative.text}`;
+  } else if (narrative?.key) {
+    const params = narrative.paramsBuilder
+      ? await narrative.paramsBuilder(channelLang)
+      : undefined;
+    narrativeText = `${baseLine}\n${t(channelLang, narrative.key, params)}`;
+  }
+
+  if (isTelegramKey(game.channelId)) {
+    await announceToChannel(client, game.channelId, narrativeText);
   } else {
-    await announceToChannelLocalized(client, game, "phase.day_start", () => ({
-      round: game.round,
-    }));
+    let cardTs = null;
+    try {
+      cardTs = await postPhaseCard(client, game, "day", narrativeText);
+    } catch (err) {
+      console.error("Failed to post day card:", err?.data || err);
+      await announceToChannel(client, game.channelId, narrativeText);
+    }
+    await postPhaseMedia(client, game, "day", narrativeText, cardTs);
   }
 
   await postOrUpdateDashboard(client, game);
@@ -6121,8 +6368,7 @@ async function resolveNight(client, game, autoApplied) {
     return;
   }
 
-  const dayStartText = t(channelLang, "phase.day_start", { round: game.round });
-  await startDay(client, game, { text: `${summaryText}\n${dayStartText}` });
+  await startDay(client, game, { text: summaryText });
 }
 
 async function resolveDay(client, game, autoApplied) {
@@ -6220,9 +6466,7 @@ async function resolveDay(client, game, autoApplied) {
     return;
   }
 
-  const nextRound = game.round + 1;
-  const nightStartText = t(channelLang, "phase.night_start", { round: nextRound });
-  await startNight(client, game, { text: `${summaryText}\n${nightStartText}` });
+  await startNight(client, game, { text: summaryText });
 }
 
 async function autoResolvePhase(client, game) {
@@ -11914,6 +12158,7 @@ async function restoreActiveGames() {
   if (telegramMode !== "webhook") {
     startHealthServer();
   }
+  startKeepAlive();
   await restoreActiveGames();
   await maybeNotifyMaintenanceDone(app.client);
   console.log("Mafia bot is running (Socket Mode).");
