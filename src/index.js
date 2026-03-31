@@ -3102,10 +3102,12 @@ function buildFaqListView(lang, page = 0) {
   const blocks = [
     {
       type: "header",
+      block_id: "faq_header",
       text: { type: "plain_text", text: t(lang, "faq.title") },
     },
     {
       type: "section",
+      block_id: "faq_intro",
       text: { type: "mrkdwn", text: t(lang, "faq.intro") },
     },
   ];
@@ -3113,6 +3115,7 @@ function buildFaqListView(lang, page = 0) {
   slice.forEach((item) => {
     blocks.push({
       type: "section",
+      block_id: `faq_item_${item.id}`,
       text: { type: "mrkdwn", text: `• ${item.q}` },
       accessory: {
         type: "button",
@@ -3126,6 +3129,7 @@ function buildFaqListView(lang, page = 0) {
   if (totalPages > 1) {
     blocks.push({
       type: "actions",
+      block_id: "faq_nav",
       elements: [
         {
           type: "button",
@@ -3141,6 +3145,7 @@ function buildFaqListView(lang, page = 0) {
     });
     blocks.push({
       type: "context",
+      block_id: "faq_page",
       elements: [
         {
           type: "mrkdwn",
@@ -8745,14 +8750,19 @@ app.action(
         : currentPage - 1;
     const view = buildFaqListView(lang, nextPage);
     if (body.view) {
-      await client.views.update({
-        view_id: body.view.id,
-        hash: body.view.hash,
-        view,
-      });
-      return;
+      try {
+        await client.views.update({
+          view_id: body.view.id,
+          view,
+        });
+        return;
+      } catch (err) {
+        console.error("FAQ page update failed:", err);
+      }
     }
-    await client.views.open({ trigger_id: body.trigger_id, view });
+    if (body.trigger_id) {
+      await client.views.open({ trigger_id: body.trigger_id, view });
+    }
   }
 );
 
@@ -8769,12 +8779,15 @@ app.action(ACTIONS.FAQ_TOPIC, async ({ ack, body, action, client }) => {
 
   if (body.view) {
     if (isFaqView(body.view)) {
-      await client.views.update({
-        view_id: body.view.id,
-        hash: body.view.hash,
-        view,
-      });
-      return;
+      try {
+        await client.views.update({
+          view_id: body.view.id,
+          view,
+        });
+        return;
+      } catch (err) {
+        console.error("FAQ topic update failed:", err);
+      }
     }
     await client.views.push({ trigger_id: body.trigger_id, view });
     return;
@@ -8789,14 +8802,19 @@ app.action(ACTIONS.FAQ_BACK, async ({ ack, body, client }) => {
   const page = getFaqPageFromView(body.view);
   const view = buildFaqListView(lang, page);
   if (body.view) {
-    await client.views.update({
-      view_id: body.view.id,
-      hash: body.view.hash,
-      view,
-    });
-    return;
+    try {
+      await client.views.update({
+        view_id: body.view.id,
+        view,
+      });
+      return;
+    } catch (err) {
+      console.error("FAQ back update failed:", err);
+    }
   }
-  await client.views.open({ trigger_id: body.trigger_id, view });
+  if (body.trigger_id) {
+    await client.views.open({ trigger_id: body.trigger_id, view });
+  }
 });
 
 app.action(ACTIONS.MY_CHANNELS_OPEN, async ({ ack, body, client }) => {
