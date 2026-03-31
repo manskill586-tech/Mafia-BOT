@@ -24,6 +24,46 @@ npm.cmd start
 
 You should see "Socket Mode connected" in logs.
 
+## Gameplay (Beginner Friendly)
+
+### Goal of the game
+Mafia is a team game. The Mafia side wins when they reach parity with the town (same number). The Town wins by eliminating all Mafia. Neutral roles have their own win condition.
+
+### Step-by-step flow
+1. **Lobby**: Host creates a lobby, players press `Join`, and the host presses `Start` (or everyone presses `Ready`).
+2. **Night**: Everyone gets **DM buttons** for their night action. Mafia secretly picks a target. Doctor saves, Detective checks or kills, etc.
+3. **Day**: Everyone gets **DM buttons** to vote. The most voted player is eliminated (tie means nobody is eliminated).
+4. **Repeat**: Night → Day cycles until a win condition is met.
+5. **End**: The bot posts the winner and the role summary.
+
+### What you should do
+- **If you are Mafia**: coordinate at night, pick a target, and guide the discussion by day.
+- **If you are Town**: track claims, compare stories, and vote carefully.
+
+### All roles (simple explanations)
+- **Mafia** — kills at night, tries to reach parity with Town.
+- **Doctor** — saves one player each night (self‑save limited).
+- **Detective** — each night chooses **either** check or kill (only one).
+- **Mayor** — double vote during the day.
+- **Bodyguard** — protects a player and takes the hit.
+- **Jester** — wins if executed by day vote.
+- **Godfather** — Mafia, but appears Town to Detective.
+- **Lucky** — has a 50% chance to survive any night kill.
+- **Bum** — visits a player; if they die, you may witness the killer.
+- **Sergeant** — receives Detective info; replaces Detective if they die.
+- **Lawyer** — protects a player; if it’s Mafia, Detective sees Town.
+- **Stalker** — neutral killer with a role contract target.
+- **Town** — no night power, wins by voting out Mafia.
+
+### Example round (mini walkthrough)
+Lobby → Night: Mafia selects Alice, Doctor saves Alice → Day: town votes Bob → Result posted → Next Night.
+
+### Common beginner tips
+- Always check your **DM** for action buttons. If you don’t respond, the bot may auto‑choose.
+- Use `@MafiaBot status` anytime to see the phase and alive count.
+- If you play multiple games, include the channel in DM commands (e.g. `vote @user #channel`).
+- More commands and controls are listed below in **Commands (Slack)**.
+
 ## Day/Night media and Home icon
 
 - Day/Night MP4 in the channel requires the `files:write` scope and app reinstall.
@@ -215,6 +255,7 @@ Default language is English.
 - Last words: after death bot asks for a DM and posts it to the channel.
 - Game Dashboard is pinned (phase/timer/alive).
 - State is stored in Postgres (Render) or SQLite (`data/mafia.db`) locally when `DATABASE_URL` is absent.
+- For a full walkthrough, see **Gameplay (Beginner Friendly)** above.
 
 ## Render + Postgres
 
