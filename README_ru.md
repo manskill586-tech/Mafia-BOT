@@ -1,8 +1,10 @@
 ﻿# Mafia Slack Bot
 
-Полноценный мафия-бот для Slack (Socket Mode) с анонимными голосованиями, таймерами и сохранением состояния в Postgres (Render) или SQLite (локально).
+Полноценный мафия-бот для Slack (Socket Mode) с анонимными голосованиями, таймерами, DM-действиями и сохранением состояния в Postgres (Render) или SQLite (локально).
 
-## Быстрый старт
+Поддержка Telegram опциональна и описана в конце. Основной фокус — Slack.
+
+## Быстрый старт (только Slack)
 
 1. Создайте Slack App из `manifest.json`.
 2. Включите Socket Mode и создайте app-level token с правом `connections:write`.
@@ -11,12 +13,7 @@
    - Signing Secret
    - App Token (`xapp-...`)
 4. Создайте `.env` на основе `.env.example`.
-5. Для Render подключите Postgres и укажите `DATABASE_URL` (и `PGSSL=1`).
-6. Для Telegram создайте бота через @BotFather и получите токен.
-7. Укажите `TELEGRAM_BOT_TOKEN` и, если нужен webhook, `TELEGRAM_WEBHOOK_DOMAIN`, `TELEGRAM_WEBHOOK_PATH`, `PORT`.
-8. Если Telegram работает через webhook, задайте `SLACK_PORT=0` или другой порт, чтобы `PORT` был свободен для Telegram.
-9. Если `TELEGRAM_WEBHOOK_DOMAIN` не задан, Telegram будет работать через polling (удобно локально).
-10. Установите зависимости и запустите:
+5. Установите зависимости и запустите:
 
 ```bash
 cd /d E:\my_projects\Mafia Slack Bot
@@ -30,7 +27,7 @@ npm start
 npm.cmd start
 ```
 
-Примечание: в режиме polling бот поднимает health‑server на `PORT`, чтобы Render видел открытый порт.
+В логах должно быть сообщение о подключении Socket Mode.
 
 ## Медиа day/night и Home‑иконка
 
@@ -40,7 +37,7 @@ npm.cmd start
   - Бот раздаёт `/assets/*` через health‑server (PORT).
 - Если `ASSET_BASE_URL` не указан — иконки в Home будут скрыты (только текст).
 
-## Гайд для новичков (шаг за шагом)
+## Гайд для новичков (Slack, шаг за шагом)
 
 ### 1) Установите всё необходимое
 - Установите Node.js (LTS).
@@ -52,9 +49,11 @@ npm install
 ```
 
 ### 3) Создайте Slack App (из manifest)
-1. В Slack API → **Create App** → **From an app manifest**.
+1. В Slack API -> Create App -> From an app manifest.
 2. Вставьте содержимое `manifest.json`.
-3. Установите приложение в workspace.
+3. Создайте приложение.
+4. Включите Socket Mode.
+5. Установите приложение в workspace.
 
 ### 4) Получите токены Slack
 В настройках приложения:
@@ -65,9 +64,9 @@ npm install
 Укажите их в `.env`.
 
 Где найти эти значения в Slack:
-- **Bot Token**: App → **OAuth & Permissions** → “Bot User OAuth Token”.
-- **Signing Secret**: App → **Basic Information** → “App Credentials”.
-- **App Token**: App → **Socket Mode** → “Generate an app-level token” (scope `connections:write`).
+- Bot Token: App -> OAuth & Permissions -> Bot User OAuth Token.
+- Signing Secret: App -> Basic Information -> App Credentials.
+- App Token: App -> Socket Mode -> Generate an app-level token (scope `connections:write`).
 
 ### 5) Запуск локально
 ```bash
@@ -88,10 +87,23 @@ npm start
 ```
 Игроки заходят `Join`, хост запускает `Start`.
 
-### 8) Обновили scopes — переустановите
-Если меняли `manifest.json`, **переустановите** приложение.
+### 8) Обязательные настройки Slack
+Для кнопок, событий и лички нужно включить:
+- Interactivity & Shortcuts -> On
+- Event Subscriptions -> On
+- App Home -> включить "Allow users to send messages to this app" (иначе личка не работает)
 
-### 9) Render (прод)
+### 9) Обновили scopes — переустановите
+Если меняли `manifest.json`, переустановите приложение.
+
+### Карта настроек Slack (где искать)
+- Socket Mode: App -> Socket Mode
+- App Home (личка): App -> App Home
+- Interactivity & Shortcuts: App -> Interactivity & Shortcuts
+- Event Subscriptions: App -> Event Subscriptions
+- OAuth scopes: App -> OAuth & Permissions
+
+### 10) Render (прод)
 1. Создайте Render Web Service.
 2. Добавьте переменные окружения из `.env`.
 3. Подключите Postgres и укажите:
@@ -100,10 +112,10 @@ npm start
 4. Задеплойте сервис.
 
 Где взять `DATABASE_URL` в Render:
-- Render → **PostgreSQL** → ваша БД → **Info** → “Internal Database URL”.
-- Используйте **Internal Database URL** для сервисов Render (стабильнее и без проблем с доступом).
+- Render -> PostgreSQL -> ваша БД -> Info -> Internal Database URL.
+- Используйте Internal Database URL для сервисов Render (стабильнее и без проблем с доступом).
 
-### 9.1) Как не уходить в sleep (опционально)
+### 10.1) Как не уходить в sleep (опционально)
 На бесплатном плане Render может «усыплять» сервис без трафика.
 Включите keep‑alive ping:
 - Укажите `KEEP_ALIVE_URL` = Service URL.
@@ -111,15 +123,15 @@ npm start
 
 Примечание: keep‑alive помогает, но стопроцентная гарантия — только платный план.
 
-### 10) Assets (иконки + day/night медиа)
+### 11) Assets (иконки + day/night медиа)
 - Укажите `ASSET_BASE_URL=https://<ваш-домен>`, чтобы Slack грузил картинки.
 - Для day/night MP4 нужен `files:write`.
 
 Где взять `ASSET_BASE_URL`:
-- Render → ваш Web Service → **Settings** → “Service URL”  
+- Render -> ваш Web Service -> Settings -> Service URL
   Пример: `https://your-service.onrender.com`
 
-### 11) Telegram webhook (опционально)
+### 12) Telegram webhook (опционально)
 Если используете Telegram webhook:
 - `TELEGRAM_WEBHOOK_DOMAIN` = Service URL Render
 - `TELEGRAM_WEBHOOK_PATH` = `/telegram` (по умолчанию)
@@ -153,19 +165,20 @@ npm install
 2. Перезапускаем `npm start`.
 3. Если меняли scopes — переустановка Slack App.
 
-### Полезные логи
+### Полезные логи (Slack)
 Если что‑то не работает, смотрите терминал:
 - статус подключения Slack
-- статус Telegram webhook/polling
 - ошибки базы
 
-### Частые проблемы
-- **Бот не пишет в личку**: Slack может блокировать сообщения от приложений.
-- **Кнопки не работают**: включите Interactivity в Slack App.
+### Частые проблемы (Slack)
+- **В личке пишет “Sending messages to this app has been turned off”**: App -> App Home -> включить "Allow users to send messages to this app".
+- **Кнопки не работают**: App -> Interactivity & Shortcuts -> On.
+- **Бот не реагирует на упоминания**: App -> Event Subscriptions -> On и бот должен быть в канале.
 - **Home пустой**: откройте Home заново или смотрите логи.
 - **Видео не публикуется**: нужен `files:write` + переустановка.
+- **Сообщения не удаляются**: проверьте настройки удаления сообщений и переустановите после изменения scope.
 
-## Команды
+## Команды (Slack)
 
 Slack в канале (через упоминание бота):
 - `@MafiaBot create` — создать лобби
@@ -192,24 +205,6 @@ Slack в личке (fallback):
 - Кнопка `Найти игры` в личке — список публичных каналов с играми
 - Кнопка `Мои каналы` в личке — редактирование приватности и настроек по умолчанию
 По умолчанию язык сообщений — English.
-
-Telegram в группах:
-- `/create` — создать лобби
-- `/join` — войти
-- `/leave` — выйти
-- `/start` — начать игру (только хост)
-- `/extend 2` — продлить лобби на 2 минуты
-- `/status` — статус
-- `/config` — настройки (day/night/lobby/min/extend/lang)
-- `/end` — завершить игру (только хост)
-
-Telegram в личке:
-- `/home` — статистика и текущая игра
-- `/faq` — FAQ
-- `/find` — найти игры
-- `/mychannels` — ваши каналы
-- `/lang en|ru` — язык сообщений
-- `/whisper <text>` — анонимный шёпот (1 раз за день)
 
 ## Механика
 
@@ -292,3 +287,25 @@ Telegram в личке:
 
 Если вы обновили `manifest.json`, переустановите приложение, чтобы обновить выданные права.
 Для новых функций нужны дополнительные права (`pins:write`, `groups:write`, `mpim:write`, `channels:read`, `groups:read`, `files:write`).
+
+## Telegram (опционально)
+
+Настройка Telegram описана в разделе "12) Telegram webhook (опционально)".
+
+Telegram в группах:
+- `/create` — создать лобби
+- `/join` — войти
+- `/leave` — выйти
+- `/start` — начать игру (только хост)
+- `/extend 2` — продлить лобби на 2 минуты
+- `/status` — статус
+- `/config` — настройки (day/night/lobby/min/extend/lang)
+- `/end` — завершить игру (только хост)
+
+Telegram в личке:
+- `/home` — статистика и текущая игра
+- `/faq` — FAQ
+- `/find` — найти игры
+- `/mychannels` — ваши каналы
+- `/lang en|ru` — язык сообщений
+- `/whisper <text>` — анонимный шёпот (1 раз за день)
