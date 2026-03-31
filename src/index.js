@@ -8755,14 +8755,12 @@ app.action(
           view_id: body.view.id,
           view,
         });
-        return;
       } catch (err) {
         console.error("FAQ page update failed:", err);
       }
+      return;
     }
-    if (body.trigger_id) {
-      await client.views.open({ trigger_id: body.trigger_id, view });
-    }
+    if (body.trigger_id) await client.views.open({ trigger_id: body.trigger_id, view });
   }
 );
 
@@ -8787,6 +8785,7 @@ app.action(ACTIONS.FAQ_TOPIC, async ({ ack, body, action, client }) => {
         return;
       } catch (err) {
         console.error("FAQ topic update failed:", err);
+        return;
       }
     }
     await client.views.push({ trigger_id: body.trigger_id, view });
@@ -8810,11 +8809,10 @@ app.action(ACTIONS.FAQ_BACK, async ({ ack, body, client }) => {
       return;
     } catch (err) {
       console.error("FAQ back update failed:", err);
+      return;
     }
   }
-  if (body.trigger_id) {
-    await client.views.open({ trigger_id: body.trigger_id, view });
-  }
+  if (body.trigger_id) await client.views.open({ trigger_id: body.trigger_id, view });
 });
 
 app.action(ACTIONS.MY_CHANNELS_OPEN, async ({ ack, body, client }) => {
