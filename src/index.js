@@ -601,16 +601,16 @@ const I18N = {
       summary_jester: ":trophy: {winner}\n:jester: Jester: {jester}\n:mafia: Mafia: {mafia}\n:town: Town: {town}" ,
     },
     prompt: {
-      mafia: ":mafia: Game in {channel}. Choose mafia target." ,
-      doctor: ":doctor: Game in {channel}. Who to save tonight?" ,
-      detective_mode: ":detective: Choose your action for tonight: "  ,
-      detective: ":detective: Game in {channel}. Who to check?" ,
-      detective_kill: ":kill: Game in {channel}. Who to kill?" ,
-      bodyguard: ":bodyguard: Game in {channel}. Who to protect?" ,
-      bum: ":bum: Game in {channel}. Who to visit tonight?" ,
-      lawyer: ":lawyer: Game in {channel}. Who to protect?" ,
-      stalker: ":stalker: Contract: {role}. Choose your target." ,
-      day: ":vote: Game in {channel}. Your vote to eliminate." ,
+      mafia: ":mafia: Game in {channel}. Who should be killed?" ,
+      doctor: ":doctor: Game in {channel}. Who should be saved tonight?" ,
+      detective_mode: ":detective: Choose your action for tonight."  ,
+      detective: ":detective: Game in {channel}. Who should be checked?" ,
+      detective_kill: ":kill: Game in {channel}. Who should be killed?" ,
+      bodyguard: ":bodyguard: Game in {channel}. Who should be protected?" ,
+      bum: ":bum: Game in {channel}. Who should be visited tonight?" ,
+      lawyer: ":lawyer: Game in {channel}. Who should be protected?" ,
+      stalker: ":stalker: Contract role: {role}. Who should be killed?" ,
+      day: ":vote: Game in {channel}. Who should be eliminated today?" ,
     },
     select: {
       player: ":mag_right: Select a player" ,
@@ -1141,16 +1141,16 @@ const I18N = {
       summary_jester: ":trophy: {winner}\n:jester: Шут: {jester}\n:mafia: Мафия: {mafia}\n:town: Мирные: {town}" ,
     },
     prompt: {
-      mafia: ":mafia: Игра в {channel}. Выберите цель для мафии." ,
-      doctor: ":doctor: Игра в {channel}. Кого спасти этой ночью?" ,
-      detective_mode: ":detective: Выберите действие на эту ночь: "  ,
+      mafia: ":mafia: Игра в {channel}. Кого убить?" ,
+      doctor: ":doctor: Игра в {channel}. Кого вылечить этой ночью?" ,
+      detective_mode: ":detective: Выберите действие на эту ночь."  ,
       detective: ":detective: Игра в {channel}. Кого проверить?" ,
-      detective_kill: ":kill: Игра в {channel}. Кого убить?" ,
-      bodyguard: ":bodyguard: Игра в {channel}. Кого защищать?" ,
+      detective_kill: ":kill: Игра в {channel}. Кого застрелить?" ,
+      bodyguard: ":bodyguard: Игра в {channel}. Кого защитить?" ,
       bum: ":bum: Игра в {channel}. К кому зайти этой ночью?" ,
-      lawyer: ":lawyer: Игра в {channel}. Кого защищать?" ,
-      stalker: ":stalker: Контракт: {role}. Выберите цель." ,
-      day: ":vote: Игра в {channel}. Ваш голос за исключение." ,
+      lawyer: ":lawyer: Игра в {channel}. Кого прикрыть?" ,
+      stalker: ":stalker: Контракт: {role}. Кого устранить?" ,
+      day: ":vote: Игра в {channel}. За кого голосовать сегодня?" ,
     },
     select: {
       player: ":mag_right: Выберите игрока" ,
@@ -2647,14 +2647,24 @@ function assignRoles(game) {
     "sergeant",
     "lawyer",
   ]);
+  const mandatoryTownPool = ["mayor", "bodyguard", "lucky", "bum", "sergeant"];
+  const mandatoryTownRole =
+    totalPlayers >= 4 ? randomChoice(mandatoryTownPool) : null;
 
   const rolesToAssign = [];
   for (let i = 0; i < mafiaCount; i += 1) rolesToAssign.push("mafia");
   if (includeStalker) rolesToAssign.push("stalker");
   rolesToAssign.push("doctor", "detective");
+  if (mandatoryTownRole) rolesToAssign.push(mandatoryTownRole);
 
   const remainingSlots = Math.max(0, totalPlayers - rolesToAssign.length);
-  const picked = pool.slice(0, Math.min(remainingSlots, pool.length));
+  const poolWithoutMandatory = mandatoryTownRole
+    ? pool.filter((role) => role !== mandatoryTownRole)
+    : pool;
+  const picked = poolWithoutMandatory.slice(
+    0,
+    Math.min(remainingSlots, poolWithoutMandatory.length)
+  );
   const useGodfather = picked.includes("godfather");
   picked
     .filter((role) => role !== "godfather")
