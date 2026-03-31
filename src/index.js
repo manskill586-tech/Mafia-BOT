@@ -3500,7 +3500,7 @@ function buildPlayerButtonBlocks({
   if (extraButtons && extraButtons.length) {
     blocks.push({
       type: "actions",
-      block_id: `pg|${actionId}|${channelId}|${safePage}`,
+      block_id: `pg|${actionId}|${channelId}|${safePage}|extra`,
       elements: extraButtons.map((button) => ({
         type: "button",
         text: { type: "plain_text", text: button.text, emoji: false },
@@ -3513,9 +3513,10 @@ function buildPlayerButtonBlocks({
 
   for (let i = 0; i < pagePlayers.length; i += BUTTONS_PER_ROW) {
     const row = pagePlayers.slice(i, i + BUTTONS_PER_ROW);
+    const rowIndex = Math.floor(i / BUTTONS_PER_ROW);
     blocks.push({
       type: "actions",
-      block_id: `pg|${actionId}|${channelId}|${safePage}`,
+      block_id: `pg|${actionId}|${channelId}|${safePage}|row${rowIndex}`,
       elements: row.map((player) => ({
         type: "button",
         text: { type: "plain_text", text: player.text, emoji: false },
@@ -3528,7 +3529,7 @@ function buildPlayerButtonBlocks({
   if (totalPages > 1) {
     blocks.push({
       type: "actions",
-      block_id: `pg|${actionId}|${channelId}|${safePage}`,
+      block_id: `pg|${actionId}|${channelId}|${safePage}|nav`,
       elements: [
         {
           type: "button",
