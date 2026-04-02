@@ -5138,6 +5138,28 @@ async function sendInteractiveDM(client, userId, text, blocks) {
   await client.chat.postMessage(payload);
 }
 
+async function sendEphemeralActionPanel(
+  client,
+  channelId,
+  userId,
+  text,
+  blocks
+) {
+  if (!client) return;
+  if (isTelegramKey(channelId) || isTelegramKey(userId)) return;
+  if (!channelId || !userId) return;
+  try {
+    await client.chat.postEphemeral({
+      channel: stripPlatformPrefix(channelId),
+      user: stripPlatformPrefix(userId),
+      text,
+      blocks,
+    });
+  } catch (err) {
+    console.error("Failed to send ephemeral action panel:", err?.data || err);
+  }
+}
+
 async function editTelegramMessage(chatId, messageId, text, reply_markup) {
   if (!telegramBot) return;
   if (!chatId || !messageId) return;
@@ -5219,22 +5241,38 @@ async function closeAllLobbiesForMaintenance(client) {
 }
 
 async function updateActionMessage(client, body, text, blocks) {
-  if (!body?.message?.ts || !body?.channel?.id) return;
+  if (!body?.channel?.id) return;
+  const isEphemeral =
+    body?.container?.is_ephemeral || body?.message?.is_ephemeral;
+  const payloadBlocks =
+    blocks ||
+    [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text,
+        },
+      },
+    ];
+
+  if (isEphemeral) {
+    if (!body?.user?.id) return;
+    await client.chat.postEphemeral({
+      channel: body.channel.id,
+      user: body.user.id,
+      text,
+      blocks: payloadBlocks,
+    });
+    return;
+  }
+
+  if (!body?.message?.ts) return;
   await client.chat.update({
     channel: body.channel.id,
     ts: body.message.ts,
     text,
-    blocks:
-      blocks ||
-      [
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text,
-          },
-        },
-      ],
+    blocks: payloadBlocks,
   });
 }
 
@@ -6541,7 +6579,14 @@ async function sendNightPrompts(client, game) {
       extraButtons,
     });
 
-    await sendInteractiveDM(client, mafiaId, promptText, blocks);
+    await sendEphemeralActionPanel(
+      client,
+      game.channelId,
+      mafiaId,
+      promptText,
+      blocks
+    );
+    await sendInteractiveDM(client, mafiaId, promptText);
   }
 
   if (game.roles.doctorId && isPlayerAlive(game, game.roles.doctorId)) {
@@ -6560,7 +6605,14 @@ async function sendNightPrompts(client, game) {
         lang,
       });
 
-      await sendInteractiveDM(client, game.roles.doctorId, promptText, blocks);
+      await sendEphemeralActionPanel(
+        client,
+        game.channelId,
+        game.roles.doctorId,
+        promptText,
+        blocks
+      );
+      await sendInteractiveDM(client, game.roles.doctorId, promptText);
     }
   }
 
@@ -6571,12 +6623,14 @@ async function sendNightPrompts(client, game) {
         channel: channelMention(game.channelId),
       });
       const blocks = buildDetectiveModeBlocks(lang, game.channelId, promptText);
-      await sendInteractiveDM(
+      await sendEphemeralActionPanel(
         client,
+        game.channelId,
         game.roles.detectiveId,
         promptText,
         blocks
       );
+      await sendInteractiveDM(client, game.roles.detectiveId, promptText);
     }
   }
 
@@ -6596,12 +6650,14 @@ async function sendNightPrompts(client, game) {
         lang,
       });
 
-      await sendInteractiveDM(
+      await sendEphemeralActionPanel(
         client,
+        game.channelId,
         game.roles.bodyguardId,
         promptText,
         blocks
       );
+      await sendInteractiveDM(client, game.roles.bodyguardId, promptText);
     }
   }
 
@@ -6620,7 +6676,14 @@ async function sendNightPrompts(client, game) {
         pageSize: BUTTON_PAGE_SIZE,
         lang,
       });
-      await sendInteractiveDM(client, game.roles.bumId, promptText, blocks);
+      await sendEphemeralActionPanel(
+        client,
+        game.channelId,
+        game.roles.bumId,
+        promptText,
+        blocks
+      );
+      await sendInteractiveDM(client, game.roles.bumId, promptText);
     }
   }
 
@@ -6639,7 +6702,14 @@ async function sendNightPrompts(client, game) {
         pageSize: BUTTON_PAGE_SIZE,
         lang,
       });
-      await sendInteractiveDM(client, game.roles.lawyerId, promptText, blocks);
+      await sendEphemeralActionPanel(
+        client,
+        game.channelId,
+        game.roles.lawyerId,
+        promptText,
+        blocks
+      );
+      await sendInteractiveDM(client, game.roles.lawyerId, promptText);
     }
   }
 
@@ -6668,7 +6738,14 @@ async function sendNightPrompts(client, game) {
         pageSize: BUTTON_PAGE_SIZE,
         lang,
       });
-      await sendInteractiveDM(client, game.roles.stalkerId, promptText, blocks);
+      await sendEphemeralActionPanel(
+        client,
+        game.channelId,
+        game.roles.stalkerId,
+        promptText,
+        blocks
+      );
+      await sendInteractiveDM(client, game.roles.stalkerId, promptText);
     }
   }
 }
@@ -6867,7 +6944,14 @@ async function sendDayPrompts(client, game) {
       extraButtons,
     });
 
-    await sendInteractiveDM(client, userId, promptText, blocks);
+    await sendEphemeralActionPanel(
+      client,
+      game.channelId,
+      userId,
+      promptText,
+      blocks
+    );
+    await sendInteractiveDM(client, userId, promptText);
   }
 }
 
