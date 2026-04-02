@@ -115,6 +115,8 @@ function startHealthServer() {
             ? "image/jpeg"
             : ext === ".png"
             ? "image/png"
+            : ext === ".gif"
+            ? "image/gif"
             : ext === ".mp4"
             ? "video/mp4"
             : "application/octet-stream";
@@ -5534,6 +5536,20 @@ async function announceToChannel(client, channelId, text) {
   await client.chat.postMessage({ channel: stripPlatformPrefix(channelId), text });
 }
 
+function getPhaseMediaAsset(phase) {
+  const gifName = phase === "day" ? "day.gif" : "night.gif";
+  const gifPath = path.join(ASSETS_DIR, gifName);
+  if (fs.existsSync(gifPath)) {
+    return { fileName: gifName, filePath: gifPath, type: "gif" };
+  }
+  const mp4Name = phase === "day" ? ASSET_FILES.day : ASSET_FILES.night;
+  const mp4Path = path.join(ASSETS_DIR, mp4Name);
+  if (fs.existsSync(mp4Path)) {
+    return { fileName: mp4Name, filePath: mp4Path, type: "mp4" };
+  }
+  return null;
+}
+
 function buildPhaseCardText(game, phase, narrativeText, lang) {
   const title =
     phase === "day"
@@ -5593,19 +5609,19 @@ async function postPhaseCard(client, game, phase, narrativeText) {
   return res?.ts || null;
 }
 
-async function postPhaseMedia(client, game, phase, narrativeText, threadTs) {
-  const fileName = phase === "day" ? ASSET_FILES.day : ASSET_FILES.night;
-  const filePath = path.join(ASSETS_DIR, fileName);
-  if (!fs.existsSync(filePath)) return false;
+async function postPhaseMedia(client, game, phase, narrativeText) {
+  const asset = getPhaseMediaAsset(phase);
+  if (!asset) return false;
   try {
-    const initialComment = threadTs ? undefined : narrativeText;
+    if (asset.type === "mp4") {
+      console.warn(`Phase media GIF not found, using MP4: ${asset.fileName}`);
+    }
     await client.files.uploadV2({
       channel_id: stripPlatformPrefix(game.channelId),
-      file: fs.createReadStream(filePath),
-      filename: fileName,
+      file: fs.createReadStream(asset.filePath),
+      filename: asset.fileName,
       title: phase === "day" ? "Day" : "Night",
-      initial_comment: initialComment,
-      thread_ts: threadTs || undefined,
+      initial_comment: narrativeText,
     });
     return true;
   } catch (err) {
@@ -6199,14 +6215,15 @@ async function startNight(client, game, narrative) {
   if (isTelegramKey(game.channelId)) {
     await announceToChannel(client, game.channelId, narrativeText);
   } else {
-    let cardTs = null;
-    try {
-      cardTs = await postPhaseCard(client, game, "night", narrativeText);
-    } catch (err) {
-      console.error("Failed to post night card:", err?.data || err);
-      await announceToChannel(client, game.channelId, narrativeText);
+    const mediaPosted = await postPhaseMedia(client, game, "night", narrativeText);
+    if (!mediaPosted) {
+      try {
+        await postPhaseCard(client, game, "night", narrativeText);
+      } catch (err) {
+        console.error("Failed to post night card:", err?.data || err);
+        await announceToChannel(client, game.channelId, narrativeText);
+      }
     }
-    await postPhaseMedia(client, game, "night", narrativeText, cardTs);
   }
 
   if (game.roles.stalkerId && !game.stalker?.targetRole) {
@@ -6255,14 +6272,15 @@ async function startDay(client, game, narrative) {
   if (isTelegramKey(game.channelId)) {
     await announceToChannel(client, game.channelId, narrativeText);
   } else {
-    let cardTs = null;
-    try {
-      cardTs = await postPhaseCard(client, game, "day", narrativeText);
-    } catch (err) {
-      console.error("Failed to post day card:", err?.data || err);
-      await announceToChannel(client, game.channelId, narrativeText);
+    const mediaPosted = await postPhaseMedia(client, game, "day", narrativeText);
+    if (!mediaPosted) {
+      try {
+        await postPhaseCard(client, game, "day", narrativeText);
+      } catch (err) {
+        console.error("Failed to post day card:", err?.data || err);
+        await announceToChannel(client, game.channelId, narrativeText);
+      }
     }
-    await postPhaseMedia(client, game, "day", narrativeText, cardTs);
   }
 
   await postOrUpdateDashboard(client, game);
