@@ -64,6 +64,26 @@ Lobby → Night: Mafia selects Alice, Doctor saves Alice → Day: town votes Bob
 - If you play multiple games, include the channel in DM commands (e.g. `vote @user #channel`).
 - More commands and controls are listed below in **Commands (Slack)**.
 
+## UX modes (Novice / Experienced)
+
+MafiaBot personalizes your experience:
+- On first DM, it asks if you have played before.
+- **Novice**: shorter instructions, minimal Home.
+- **Experienced**: full atmospheric texts and extra detail.
+
+You can switch any time:
+- DM command: `mode novice` / `mode experienced`
+- DM button: `Preferences`
+
+After **2 games** in Novice mode, the bot suggests switching to Experienced.
+
+## Leaderboard (opt‑in)
+
+- Global MMR leaderboard (Elo‑style).
+- Hidden by default until you opt in.
+- Opt‑in during onboarding or later via `Preferences`.
+- View in DM with the **Leaderboard** button or the `leaderboard` command.
+
 ## Day/Night media and Home icon
 
 - Day/Night MP4 in the channel requires the `files:write` scope and app reinstall.

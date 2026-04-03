@@ -43,6 +43,9 @@ async function migratePostgres() {
     CREATE TABLE IF NOT EXISTS user_prefs (
       user_id TEXT PRIMARY KEY,
       lang TEXT,
+      experience_mode TEXT,
+      leaderboard_visible INTEGER,
+      experience_prompted_at BIGINT,
       updated_at BIGINT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS channel_prefs (
@@ -64,6 +67,7 @@ async function migratePostgres() {
       wins INTEGER,
       losses INTEGER,
       games INTEGER,
+      mmr INTEGER DEFAULT 1000,
       updated_at BIGINT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS user_channel_stats (
@@ -102,6 +106,18 @@ async function migratePostgres() {
   await pool.query(
     "ALTER TABLE channel_prefs ADD COLUMN IF NOT EXISTS settings_json TEXT"
   );
+  await pool.query(
+    "ALTER TABLE user_prefs ADD COLUMN IF NOT EXISTS experience_mode TEXT"
+  );
+  await pool.query(
+    "ALTER TABLE user_prefs ADD COLUMN IF NOT EXISTS leaderboard_visible INTEGER"
+  );
+  await pool.query(
+    "ALTER TABLE user_prefs ADD COLUMN IF NOT EXISTS experience_prompted_at BIGINT"
+  );
+  await pool.query(
+    "ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS mmr INTEGER DEFAULT 1000"
+  );
 }
 
 function migrateSqlite() {
@@ -115,6 +131,9 @@ function migrateSqlite() {
     CREATE TABLE IF NOT EXISTS user_prefs (
       user_id TEXT PRIMARY KEY,
       lang TEXT,
+      experience_mode TEXT,
+      leaderboard_visible INTEGER,
+      experience_prompted_at INTEGER,
       updated_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS channel_prefs (
@@ -136,6 +155,7 @@ function migrateSqlite() {
       wins INTEGER,
       losses INTEGER,
       games INTEGER,
+      mmr INTEGER DEFAULT 1000,
       updated_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS user_channel_stats (
@@ -171,12 +191,32 @@ function migrateSqlite() {
       updated_at INTEGER NOT NULL
     );
   `);
-  const columns = sqlite
+  const channelColumns = sqlite
     .prepare("PRAGMA table_info(channel_prefs)")
     .all()
     .map((row) => row.name);
-  if (!columns.includes("settings_json")) {
+  if (!channelColumns.includes("settings_json")) {
     sqlite.exec("ALTER TABLE channel_prefs ADD COLUMN settings_json TEXT");
+  }
+  const userPrefColumns = sqlite
+    .prepare("PRAGMA table_info(user_prefs)")
+    .all()
+    .map((row) => row.name);
+  if (!userPrefColumns.includes("experience_mode")) {
+    sqlite.exec("ALTER TABLE user_prefs ADD COLUMN experience_mode TEXT");
+  }
+  if (!userPrefColumns.includes("leaderboard_visible")) {
+    sqlite.exec("ALTER TABLE user_prefs ADD COLUMN leaderboard_visible INTEGER");
+  }
+  if (!userPrefColumns.includes("experience_prompted_at")) {
+    sqlite.exec("ALTER TABLE user_prefs ADD COLUMN experience_prompted_at INTEGER");
+  }
+  const userStatsColumns = sqlite
+    .prepare("PRAGMA table_info(user_stats)")
+    .all()
+    .map((row) => row.name);
+  if (!userStatsColumns.includes("mmr")) {
+    sqlite.exec("ALTER TABLE user_stats ADD COLUMN mmr INTEGER DEFAULT 1000");
   }
 }
 
@@ -232,10 +272,14 @@ async function loadAllGames() {
 
 async function getUserLang(userId) {
   return dbGet(
-    "SELECT lang FROM user_prefs WHERE user_id = ?",
-    "SELECT lang FROM user_prefs WHERE user_id = $1",
+    "SELECT lang, experience_mode, leaderboard_visible, experience_prompted_at FROM user_prefs WHERE user_id = ?",
+    "SELECT lang, experience_mode, leaderboard_visible, experience_prompted_at FROM user_prefs WHERE user_id = $1",
     [userId]
   );
+}
+
+async function getUserPrefs(userId) {
+  return getUserLang(userId);
 }
 
 async function setUserLang(userId, lang, updatedAt) {
@@ -245,6 +289,36 @@ async function setUserLang(userId, lang, updatedAt) {
     "INSERT INTO user_prefs (user_id, lang, updated_at) VALUES ($1, $2, $3) " +
       "ON CONFLICT(user_id) DO UPDATE SET lang=excluded.lang, updated_at=excluded.updated_at",
     [userId, lang, updatedAt]
+  );
+}
+
+async function setUserExperienceMode(userId, mode, updatedAt) {
+  return dbRun(
+    "INSERT INTO user_prefs (user_id, experience_mode, updated_at) VALUES (?, ?, ?) " +
+      "ON CONFLICT(user_id) DO UPDATE SET experience_mode=excluded.experience_mode, updated_at=excluded.updated_at",
+    "INSERT INTO user_prefs (user_id, experience_mode, updated_at) VALUES ($1, $2, $3) " +
+      "ON CONFLICT(user_id) DO UPDATE SET experience_mode=excluded.experience_mode, updated_at=excluded.updated_at",
+    [userId, mode, updatedAt]
+  );
+}
+
+async function setLeaderboardVisible(userId, visible, updatedAt) {
+  return dbRun(
+    "INSERT INTO user_prefs (user_id, leaderboard_visible, updated_at) VALUES (?, ?, ?) " +
+      "ON CONFLICT(user_id) DO UPDATE SET leaderboard_visible=excluded.leaderboard_visible, updated_at=excluded.updated_at",
+    "INSERT INTO user_prefs (user_id, leaderboard_visible, updated_at) VALUES ($1, $2, $3) " +
+      "ON CONFLICT(user_id) DO UPDATE SET leaderboard_visible=excluded.leaderboard_visible, updated_at=excluded.updated_at",
+    [userId, visible ? 1 : 0, updatedAt]
+  );
+}
+
+async function setExperiencePromptedAt(userId, promptedAt, updatedAt) {
+  return dbRun(
+    "INSERT INTO user_prefs (user_id, experience_prompted_at, updated_at) VALUES (?, ?, ?) " +
+      "ON CONFLICT(user_id) DO UPDATE SET experience_prompted_at=excluded.experience_prompted_at, updated_at=excluded.updated_at",
+    "INSERT INTO user_prefs (user_id, experience_prompted_at, updated_at) VALUES ($1, $2, $3) " +
+      "ON CONFLICT(user_id) DO UPDATE SET experience_prompted_at=excluded.experience_prompted_at, updated_at=excluded.updated_at",
+    [userId, promptedAt, updatedAt]
   );
 }
 
@@ -310,8 +384,8 @@ async function setAppState(key, value, updatedAt) {
 
 async function getUserStats(userId) {
   return dbGet(
-    "SELECT wins, losses, games FROM user_stats WHERE user_id = ?",
-    "SELECT wins, losses, games FROM user_stats WHERE user_id = $1",
+    "SELECT wins, losses, games, mmr FROM user_stats WHERE user_id = ?",
+    "SELECT wins, losses, games, mmr FROM user_stats WHERE user_id = $1",
     [userId]
   );
 }
@@ -323,6 +397,16 @@ async function upsertUserStats(userId, wins, losses, games, updatedAt) {
     "INSERT INTO user_stats (user_id, wins, losses, games, updated_at) VALUES ($1, $2, $3, $4, $5) " +
       "ON CONFLICT(user_id) DO UPDATE SET wins=excluded.wins, losses=excluded.losses, games=excluded.games, updated_at=excluded.updated_at",
     [userId, wins, losses, games, updatedAt]
+  );
+}
+
+async function setUserMmr(userId, mmr, updatedAt) {
+  return dbRun(
+    "INSERT INTO user_stats (user_id, mmr, wins, losses, games, updated_at) VALUES (?, ?, 0, 0, 0, ?) " +
+      "ON CONFLICT(user_id) DO UPDATE SET mmr=excluded.mmr, updated_at=excluded.updated_at",
+    "INSERT INTO user_stats (user_id, mmr, wins, losses, games, updated_at) VALUES ($1, $2, 0, 0, 0, $3) " +
+      "ON CONFLICT(user_id) DO UPDATE SET mmr=excluded.mmr, updated_at=excluded.updated_at",
+    [userId, mmr, updatedAt]
   );
 }
 
@@ -377,6 +461,31 @@ async function listUserRoleStats(userId) {
   );
 }
 
+async function listLeaderboard(limit, offset) {
+  return dbAll(
+    "SELECT s.user_id, s.mmr, s.wins, s.losses, s.games, u.display_name, u.handle " +
+      "FROM user_stats s JOIN user_prefs p ON p.user_id = s.user_id " +
+      "LEFT JOIN user_cache u ON u.user_id = s.user_id " +
+      "WHERE COALESCE(p.leaderboard_visible, 0) = 1 " +
+      "ORDER BY s.mmr DESC, s.games DESC LIMIT ? OFFSET ?",
+    "SELECT s.user_id, s.mmr, s.wins, s.losses, s.games, u.display_name, u.handle " +
+      "FROM user_stats s JOIN user_prefs p ON p.user_id = s.user_id " +
+      "LEFT JOIN user_cache u ON u.user_id = s.user_id " +
+      "WHERE COALESCE(p.leaderboard_visible, 0) = 1 " +
+      "ORDER BY s.mmr DESC, s.games DESC LIMIT $1 OFFSET $2",
+    [limit, offset]
+  );
+}
+
+async function countLeaderboard() {
+  const row = await dbGet(
+    "SELECT COUNT(*) as total FROM user_stats s JOIN user_prefs p ON p.user_id = s.user_id WHERE COALESCE(p.leaderboard_visible, 0) = 1",
+    "SELECT COUNT(*) as total FROM user_stats s JOIN user_prefs p ON p.user_id = s.user_id WHERE COALESCE(p.leaderboard_visible, 0) = 1",
+    []
+  );
+  return Number(row?.total || 0);
+}
+
 async function getUserCache(userId) {
   return dbGet(
     "SELECT user_id, platform, display_name, handle FROM user_cache WHERE user_id = ?",
@@ -426,7 +535,11 @@ module.exports = {
   deleteGame,
   loadAllGames,
   getUserLang,
+  getUserPrefs,
   setUserLang,
+  setUserExperienceMode,
+  setLeaderboardVisible,
+  setExperiencePromptedAt,
   getChannelPref,
   upsertChannelPref,
   listListedChannels,
@@ -435,11 +548,14 @@ module.exports = {
   setAppState,
   getUserStats,
   upsertUserStats,
+  setUserMmr,
   getUserChannelStats,
   upsertUserChannelStats,
   getUserRoleStats,
   upsertUserRoleStats,
   listUserRoleStats,
+  listLeaderboard,
+  countLeaderboard,
   getUserCache,
   upsertUserCache,
   getChannelCache,

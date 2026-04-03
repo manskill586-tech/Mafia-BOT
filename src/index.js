@@ -4,6 +4,8 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
+const readline = require("readline");
+const { spawn } = require("child_process");
 const { App, LogLevel } = require("@slack/bolt");
 const { Telegraf, Markup } = require("telegraf");
 const db = require("./db");
@@ -52,9 +54,12 @@ const BUTTONS_PER_ROW = 5;
 const FIND_PAGE_SIZE = 5;
 const MY_CHANNELS_PAGE_SIZE = 5;
 const FAQ_PAGE_SIZE = 8;
+const LEADERBOARD_PAGE_SIZE = 10;
 const LAST_WORDS_TIMEOUT_MS = 2 * 60 * 1000;
 const PHASE_SHORTEN_THRESHOLD = 0.7;
 const PHASE_SHORTEN_REMAINING_MS = 60000;
+const EXPERIENCE_PROMPT_AFTER_GAMES = 2;
+const MMR_K_FACTOR = 24;
 const SPECIAL_TARGETS = {
   ABSTAIN: "__abstain__",
   NO_KILL: "__no_kill__",
@@ -83,9 +88,52 @@ let telegramWebhookPath = null;
 const tgUserCache = new Map();
 const tgChatCache = new Map();
 const tgHandleCache = new Map();
+let hotRestartEnabled = false;
+let hotRestartInProgress = false;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function restartProcess(reason) {
+  if (hotRestartInProgress) return;
+  hotRestartInProgress = true;
+  const label = reason ? ` (${reason})` : "";
+  console.log(`Hot restart requested${label}. Restarting...`);
+  try {
+    const args = process.argv.slice(1);
+    const child = spawn(process.execPath, args, {
+      stdio: "inherit",
+      env: process.env,
+    });
+    child.on("error", (err) => {
+      console.error("Hot restart failed to spawn process:", err);
+    });
+  } catch (err) {
+    console.error("Hot restart failed:", err);
+  }
+  setTimeout(() => process.exit(0), 300);
+}
+
+function setupHotRestart() {
+  if (!process.stdin || !process.stdin.isTTY) return;
+  try {
+    readline.emitKeypressEvents(process.stdin);
+    if (process.stdin.setRawMode) process.stdin.setRawMode(true);
+    process.stdin.on("keypress", (_str, key) => {
+      if (!key) return;
+      const isCtrlShiftR = key.ctrl && key.shift && key.name === "r";
+      const isCtrlAltR = key.ctrl && key.meta && key.name === "r";
+      if (isCtrlShiftR || isCtrlAltR) {
+        restartProcess(isCtrlShiftR ? "Ctrl+Shift+R" : "Ctrl+Alt+R");
+      }
+    });
+    process.stdin.resume();
+    hotRestartEnabled = true;
+    console.log("Hot restart enabled: Ctrl+Shift+R (or Ctrl+Alt+R).");
+  } catch (err) {
+    console.warn("Hot restart setup failed:", err);
+  }
 }
 
 function setTelegramWebhookHandler(handler, hookPath) {
@@ -350,6 +398,8 @@ const I18N = {
       help_settings: ":settings: Settings" ,
       find_games: ":find: Find games" ,
       my_channels: ":card_index_dividers: My channels" ,
+      preferences: ":settings: Preferences" ,
+      leaderboard: ":chart: Leaderboard" ,
       faq: ":question: FAQ" ,
       back: ":back: Back" ,
       public: ":public: Public" ,
@@ -362,6 +412,46 @@ const I18N = {
       filter_lang_ru: ":globe_with_meridians: RU" ,
       lang_en: ":globe_with_meridians: English" ,
       lang_ru: ":globe_with_meridians: Russian" ,
+      mode_novice: ":bulb: Novice" ,
+      mode_experienced: ":sparkles: Experienced" ,
+      leaderboard_show: ":chart: Show me" ,
+      leaderboard_hide: ":lock: Hide me" ,
+      mode_switch: ":sparkles: Switch to experienced" ,
+      mode_keep: ":bulb: Stay in novice" ,
+    },
+    onboarding: {
+      experience_question:
+        ":question: Have you played a Mafia bot before?" ,
+      experience_set_novice: ":ok: Set to Novice mode." ,
+      experience_set_experienced: ":ok: Set to Experienced mode." ,
+      leaderboard_question: ":question: Show you on the leaderboard?" ,
+      leaderboard_set_show: ":ok: You will appear on the leaderboard." ,
+      leaderboard_set_hide: ":ok: You are hidden from the leaderboard." ,
+    },
+    prefs: {
+      title: ":settings: Your preferences" ,
+      mode_label: ":settings: Mode: {mode}" ,
+      leaderboard_label: ":chart: Leaderboard: {status}" ,
+      mode_novice: ":bulb: Novice" ,
+      mode_experienced: ":sparkles: Experienced" ,
+      leaderboard_on: ":chart: Visible" ,
+      leaderboard_off: ":lock: Hidden" ,
+      saved: ":ok: Preferences saved." ,
+    },
+    mode: {
+      switch_suggestion:
+        ":sparkles: You’ve played {games} games. Switch to Experienced mode?" ,
+      switched: ":ok: Switched to Experienced mode." ,
+      kept: ":ok: Staying in Novice mode." ,
+      usage: ":help: Usage: `mode novice` or `mode experienced`." ,
+    },
+    leaderboard: {
+      title: ":chart: Leaderboard" ,
+      empty: ":inactive: No players opted in yet." ,
+      line:
+        ":chart: #{rank} {name} — MMR {mmr} • {wins}W/{losses}L ({rate}%)" ,
+      page: ":page: Page {page}/{total}" ,
+      opted_out: ":lock: You are hidden from the leaderboard." ,
     },
     dashboard: {
       title: ":dashboard: Game Dashboard" ,
@@ -372,7 +462,8 @@ const I18N = {
     },
     home: {
       title: ":mafia: MafiaBot" ,
-      tagline: ":home: Your Mafia game control center for Slack. (Developer: @bob)" ,
+      tagline:
+        ":home: Your Mafia game control center for Slack. (Developer: <https://hackclub.enterprise.slack.com/team/U0AAHSKAH6K|Bob>)" ,
       quickstart:
         ":rocket: * Quick Start*\n"   +
         ":rocket: 1  Add me to a channel: `/invite @MafiaBot`\n"   +
@@ -558,6 +649,29 @@ const I18N = {
         ":find: Find games: use the `Find games` button in DM.\n"   +
         ":card_index_dividers: My channels: use the `My channels` button in DM.\n"   +
         ":question: FAQ: use the `FAQ` button in DM." ,
+      help_intro_simple:
+        ":wave: Hi! I'm MafiaBot.\n"   +
+        ":rocket: Start: add me to a channel and press `Create`.\n"   +
+        ":speech_balloon: During the game, use the buttons I send.\n"   +
+        ":question: Use `FAQ` if you are stuck." ,
+      help_add_simple:
+        ":rocket: Add me to a channel: `/invite @MafiaBot`." ,
+      help_commands_simple:
+        ":speech_balloon: Main commands:\n"   +
+        ":speech_balloon: - `@MafiaBot create`, `join`, `start`, `status`\n"   +
+        ":speech_balloon: - DM: `whisper <text>` once per day" ,
+      help_settings_simple:
+        ":settings: Basic settings in lobby: `@MafiaBot config ...`" ,
+      help_intro_tg_simple:
+        ":wave: Hi! I'm MafiaBot for Telegram.\n"   +
+        ":rocket: Start: add me to a group and type `/create`.\n"   +
+        ":speech_balloon: Use the buttons I send during the game." ,
+      help_add_tg_simple:
+        ":rocket: Add me to a Telegram group." ,
+      help_commands_tg_simple:
+        ":speech_balloon: Main commands: `/create`, `/join`, `/start`, `/status`" ,
+      help_settings_tg_simple:
+        ":settings: Basic settings: `/config` in the group." ,
     },
     dev: {
       panel: {
@@ -669,15 +783,25 @@ const I18N = {
     },
     prompt: {
       mafia: ":mafia: Game in {channel}. Who should be killed?" ,
+      mafia_simple: ":mafia: Pick a target to kill." ,
       doctor: ":doctor: Game in {channel}. Who should be saved tonight?" ,
+      doctor_simple: ":doctor: Pick someone to save." ,
       detective_mode: ":detective: Choose your action for tonight."  ,
+      detective_mode_simple: ":detective: Choose Check or Kill." ,
       detective: ":detective: Game in {channel}. Who should be checked?" ,
+      detective_simple: ":detective: Pick someone to check." ,
       detective_kill: ":kill: Game in {channel}. Who should be killed?" ,
+      detective_kill_simple: ":kill: Pick someone to kill." ,
       bodyguard: ":bodyguard: Game in {channel}. Who should be protected?" ,
+      bodyguard_simple: ":bodyguard: Pick someone to protect." ,
       bum: ":bum: Game in {channel}. Who should be visited tonight?" ,
+      bum_simple: ":bum: Pick someone to visit." ,
       lawyer: ":lawyer: Game in {channel}. Who should be protected?" ,
+      lawyer_simple: ":lawyer: Pick someone to protect." ,
       stalker: ":stalker: Contract role: {role}. Who should be killed?" ,
+      stalker_simple: ":stalker: Contract {role}. Pick a target." ,
       day: ":vote: Game in {channel}. Vote against the player you suspect." ,
+      day_simple: ":vote: Pick who to vote against." ,
     },
     select: {
       player: ":mag_right: Select a player" ,
@@ -897,6 +1021,8 @@ const I18N = {
       help_settings: ":settings: Настройки" ,
       find_games: ":find: Найти игры" ,
       my_channels: ":card_index_dividers: Мои каналы" ,
+      preferences: ":settings: Предпочтения" ,
+      leaderboard: ":chart: Рейтинг" ,
       faq: ":question: FAQ" ,
       back: ":back: Назад" ,
       public: ":public: Публичный" ,
@@ -909,6 +1035,46 @@ const I18N = {
       filter_lang_ru: ":globe_with_meridians: RU" ,
       lang_en: ":globe_with_meridians: English" ,
       lang_ru: ":globe_with_meridians: Русский" ,
+      mode_novice: ":bulb: Новичок" ,
+      mode_experienced: ":sparkles: Опытный" ,
+      leaderboard_show: ":chart: Показывать" ,
+      leaderboard_hide: ":lock: Скрыть" ,
+      mode_switch: ":sparkles: Переключить на опытный" ,
+      mode_keep: ":bulb: Оставить новичка" ,
+    },
+    onboarding: {
+      experience_question:
+        ":question: Вы уже играли в мафия‑бота?" ,
+      experience_set_novice: ":ok: Режим новичка установлен." ,
+      experience_set_experienced: ":ok: Режим опытного установлен." ,
+      leaderboard_question: ":question: Показывать вас в рейтинге?" ,
+      leaderboard_set_show: ":ok: Вы будете в рейтинге." ,
+      leaderboard_set_hide: ":ok: Вы скрыты из рейтинга." ,
+    },
+    prefs: {
+      title: ":settings: Ваши предпочтения" ,
+      mode_label: ":settings: Режим: {mode}" ,
+      leaderboard_label: ":chart: Рейтинг: {status}" ,
+      mode_novice: ":bulb: Новичок" ,
+      mode_experienced: ":sparkles: Опытный" ,
+      leaderboard_on: ":chart: Видно" ,
+      leaderboard_off: ":lock: Скрыт" ,
+      saved: ":ok: Предпочтения сохранены." ,
+    },
+    mode: {
+      switch_suggestion:
+        ":sparkles: Вы сыграли {games} игр. Переключиться на опытный режим?" ,
+      switched: ":ok: Переключено на опытный режим." ,
+      kept: ":ok: Остаёмся в режиме новичка." ,
+      usage: ":help: Использование: `mode novice` или `mode experienced`." ,
+    },
+    leaderboard: {
+      title: ":chart: Рейтинг" ,
+      empty: ":inactive: Пока никто не показан в рейтинге." ,
+      line:
+        ":chart: #{rank} {name} — MMR {mmr} • {wins}П/{losses}П ({rate}%)" ,
+      page: ":page: Стр. {page}/{total}" ,
+      opted_out: ":lock: Вы скрыты из рейтинга." ,
     },
     dashboard: {
       title: ":dashboard: Панель игры" ,
@@ -919,7 +1085,8 @@ const I18N = {
     },
     home: {
       title: ":mafia: MafiaBot" ,
-      tagline: ":home: Ваш центр управления мафией в Slack. (Разработчик: @bob)" ,
+      tagline:
+        ":home: Ваш центр управления мафией в Slack. (Разработчик: <https://hackclub.enterprise.slack.com/team/U0AAHSKAH6K|Bob>)" ,
       quickstart:
         ":rocket: * Быстрый старт*\n"   +
         ":rocket: 1  Добавьте меня в канал: `/invite @MafiaBot`\n"   +
@@ -1106,6 +1273,29 @@ const I18N = {
         ":find: Поиск игр: кнопка `Найти игры` в личке.\n"   +
         ":card_index_dividers: Кнопка `Мои каналы` — редактирование настроек.\n"   +
         ":question: Кнопка `FAQ` — ответы на частые вопросы." ,
+      help_intro_simple:
+        ":wave: Привет! Я MafiaBot.\n"   +
+        ":rocket: Старт: добавьте меня в канал и нажмите `Create`.\n"   +
+        ":speech_balloon: В игре просто используйте кнопки.\n"   +
+        ":question: Если что-то непонятно — откройте `FAQ`." ,
+      help_add_simple:
+        ":rocket: Добавьте меня в канал: `/invite @MafiaBot`." ,
+      help_commands_simple:
+        ":speech_balloon: Главные команды:\n"   +
+        ":speech_balloon: - `@MafiaBot create`, `join`, `start`, `status`\n"   +
+        ":speech_balloon: - Личка: `whisper <текст>` раз в день" ,
+      help_settings_simple:
+        ":settings: Базовые настройки в лобби: `@MafiaBot config ...`" ,
+      help_intro_tg_simple:
+        ":wave: Привет! Я MafiaBot для Telegram.\n"   +
+        ":rocket: Старт: добавьте меня в группу и напишите `/create`.\n"   +
+        ":speech_balloon: В игре используйте кнопки." ,
+      help_add_tg_simple:
+        ":rocket: Добавьте меня в Telegram-группу." ,
+      help_commands_tg_simple:
+        ":speech_balloon: Главные команды: `/create`, `/join`, `/start`, `/status`" ,
+      help_settings_tg_simple:
+        ":settings: Базовые настройки: `/config` в группе." ,
     },
     dev: {
       panel: {
@@ -1217,15 +1407,25 @@ const I18N = {
     },
     prompt: {
       mafia: ":mafia: Игра в {channel}. Кого убить?" ,
+      mafia_simple: ":mafia: Выберите цель для убийства." ,
       doctor: ":doctor: Игра в {channel}. Кого вылечить этой ночью?" ,
+      doctor_simple: ":doctor: Выберите кого спасти." ,
       detective_mode: ":detective: Выберите действие на эту ночь."  ,
+      detective_mode_simple: ":detective: Выберите Проверить или Убить." ,
       detective: ":detective: Игра в {channel}. Кого проверить?" ,
+      detective_simple: ":detective: Выберите кого проверить." ,
       detective_kill: ":kill: Игра в {channel}. Кого застрелить?" ,
+      detective_kill_simple: ":kill: Выберите кого убить." ,
       bodyguard: ":bodyguard: Игра в {channel}. Кого защитить?" ,
+      bodyguard_simple: ":bodyguard: Выберите кого защитить." ,
       bum: ":bum: Игра в {channel}. К кому зайти этой ночью?" ,
+      bum_simple: ":bum: Выберите к кому зайти." ,
       lawyer: ":lawyer: Игра в {channel}. Кого прикрыть?" ,
+      lawyer_simple: ":lawyer: Выберите кого защитить." ,
       stalker: ":stalker: Контракт: {role}. Кого устранить?" ,
+      stalker_simple: ":stalker: Контракт {role}. Выберите цель." ,
       day: ":vote: Игра в {channel}. Проголосуйте против игрока, которого подозреваете." ,
+      day_simple: ":vote: Выберите против кого голосовать." ,
     },
     select: {
       player: ":mag_right: Выберите игрока" ,
@@ -1850,15 +2050,171 @@ function normalizeLang(lang) {
 async function getUserLangInfo(userId) {
   if (userLangCache.has(userId)) return userLangCache.get(userId);
   const row = await db.getUserLang(userId);
-  const info = row?.lang
-    ? { lang: normalizeLang(row.lang), explicit: true }
-    : { lang: DEFAULT_LANG, explicit: false };
+  const lang = row?.lang ? normalizeLang(row.lang) : DEFAULT_LANG;
+  const info = {
+    lang,
+    explicit: Boolean(row?.lang),
+    experienceMode: row?.experience_mode || null,
+    leaderboardVisible:
+      row?.leaderboard_visible === 1 ||
+      row?.leaderboard_visible === true ||
+      row?.leaderboard_visible === "1",
+    experiencePromptedAt: row?.experience_prompted_at
+      ? Number(row.experience_prompted_at)
+      : null,
+  };
   userLangCache.set(userId, info);
   return info;
 }
 
 async function getUserLang(userId) {
   return (await getUserLangInfo(userId)).lang;
+}
+
+async function getHelpText(lang, userId, key) {
+  const mode = await getUserExperienceMode(userId);
+  const simpleKey = `${key}_simple`;
+  if (mode === "novice" && getByPath(I18N[lang] || {}, simpleKey)) {
+    return t(lang, simpleKey);
+  }
+  if (mode === "novice" && getByPath(I18N[DEFAULT_LANG] || {}, simpleKey)) {
+    return t(DEFAULT_LANG, simpleKey);
+  }
+  return t(lang, key);
+}
+
+async function getExperienceText(lang, userId, key, params = {}) {
+  if (!userId) return t(lang, key, params);
+  const mode = await getUserExperienceMode(userId);
+  const simpleKey = `${key}_simple`;
+  if (mode === "novice") {
+    if (getByPath(I18N[lang] || {}, simpleKey)) {
+      return t(lang, simpleKey, params);
+    }
+    if (getByPath(I18N[DEFAULT_LANG] || {}, simpleKey)) {
+      return t(DEFAULT_LANG, simpleKey, params);
+    }
+  }
+  return t(lang, key, params);
+}
+
+async function getUserExperienceMode(userId) {
+  const info = await getUserLangInfo(userId);
+  return info.experienceMode || "novice";
+}
+
+async function getUserExperienceRaw(userId) {
+  const info = await getUserLangInfo(userId);
+  return info.experienceMode;
+}
+
+async function getLeaderboardVisible(userId) {
+  const info = await getUserLangInfo(userId);
+  return Boolean(info.leaderboardVisible);
+}
+
+async function setUserExperienceMode(userId, mode) {
+  const normalized = mode === "experienced" ? "experienced" : "novice";
+  await db.setUserExperienceMode(userId, normalized, now());
+  const current = userLangCache.get(userId) || {
+    lang: DEFAULT_LANG,
+    explicit: false,
+    experienceMode: null,
+    leaderboardVisible: false,
+    experiencePromptedAt: null,
+  };
+  userLangCache.set(userId, {
+    ...current,
+    experienceMode: normalized,
+  });
+  return normalized;
+}
+
+async function setLeaderboardVisible(userId, visible) {
+  await db.setLeaderboardVisible(userId, visible, now());
+  const current = userLangCache.get(userId) || {
+    lang: DEFAULT_LANG,
+    explicit: false,
+    experienceMode: null,
+    leaderboardVisible: false,
+    experiencePromptedAt: null,
+  };
+  userLangCache.set(userId, {
+    ...current,
+    leaderboardVisible: Boolean(visible),
+  });
+}
+
+async function setExperiencePromptedAt(userId, promptedAt) {
+  await db.setExperiencePromptedAt(userId, promptedAt, now());
+  const current = userLangCache.get(userId) || {
+    lang: DEFAULT_LANG,
+    explicit: false,
+    experienceMode: null,
+    leaderboardVisible: false,
+    experiencePromptedAt: null,
+  };
+  userLangCache.set(userId, {
+    ...current,
+    experiencePromptedAt: promptedAt,
+  });
+}
+
+async function maybeSendExperiencePrompt(client, userId) {
+  if (!userId) return false;
+  const info = await getUserLangInfo(userId);
+  if (info.experienceMode) return false;
+  if (info.experiencePromptedAt) return false;
+  await setExperiencePromptedAt(userId, now());
+  const lang = info.lang;
+  await sendInteractiveDM(
+    client,
+    userId,
+    t(lang, "onboarding.experience_question"),
+    buildExperienceModeBlocks(lang, "onboarding")
+  );
+  return true;
+}
+
+async function maybeSendTelegramExperiencePrompt(ctx, userId) {
+  if (!telegramBot || !userId) return false;
+  const info = await getUserLangInfo(userId);
+  if (info.experienceMode) return false;
+  if (info.experiencePromptedAt) return false;
+  await setExperiencePromptedAt(userId, now());
+  const lang = info.lang;
+  await replyToTelegramMessage(
+    ctx,
+    t(lang, "onboarding.experience_question"),
+    buildTelegramExperienceKeyboard("onboarding", lang)
+  );
+  return true;
+}
+
+async function maybeSuggestExperienceSwitch(client, userId) {
+  if (!userId || isTestUserId(userId)) return;
+  const info = await getUserLangInfo(userId);
+  if (info.experienceMode !== "novice") return;
+  if (info.experiencePromptedAt) return;
+  const stats = await getUserStats(userId);
+  if (stats.games < EXPERIENCE_PROMPT_AFTER_GAMES) return;
+  await setExperiencePromptedAt(userId, now());
+  const lang = info.lang;
+  if (isTelegramKey(userId)) {
+    if (!telegramBot) return;
+    await telegramBot.telegram.sendMessage(
+      stripPlatformPrefix(userId),
+      t(lang, "mode.switch_suggestion", { games: stats.games }),
+      { reply_markup: buildTelegramModeSuggestionKeyboard(lang) }
+    );
+    return;
+  }
+  await sendInteractiveDM(
+    client,
+    userId,
+    t(lang, "mode.switch_suggestion", { games: stats.games }),
+    buildModeSuggestionBlocks(lang, stats.games)
+  );
 }
 
 function isDevUser(userId) {
@@ -1906,7 +2262,14 @@ async function isMaintenanceEnabled() {
 async function setUserLang(userId, lang) {
   const normalized = normalizeLang(lang);
   await db.setUserLang(userId, normalized, now());
-  const info = { lang: normalized, explicit: true };
+  const current = userLangCache.get(userId) || {
+    lang: DEFAULT_LANG,
+    explicit: false,
+    experienceMode: null,
+    leaderboardVisible: false,
+    experiencePromptedAt: null,
+  };
+  const info = { ...current, lang: normalized, explicit: true };
   userLangCache.set(userId, info);
   return info;
 }
@@ -1921,6 +2284,7 @@ function normalizeStatsRow(row) {
     wins: row?.wins || 0,
     losses: row?.losses || 0,
     games: row?.games || 0,
+    mmr: Number.isFinite(Number(row?.mmr)) ? Number(row.mmr) : 1000,
   };
 }
 
@@ -1993,6 +2357,42 @@ async function updateUserRoleStats(userId, role, isWin) {
     next.games,
     now()
   );
+}
+
+function computeEloDelta(rating, opponentAvg, score) {
+  const expected =
+    1 / (1 + Math.pow(10, (opponentAvg - rating) / 400));
+  const delta = MMR_K_FACTOR * (score - expected);
+  return Math.round(delta);
+}
+
+async function updateUserMmr(userId, mmr) {
+  const safeMmr = Number.isFinite(Number(mmr)) ? Math.round(Number(mmr)) : 1000;
+  await db.setUserMmr(userId, safeMmr, now());
+}
+
+async function updateMmrForGame(game, winners, losers) {
+  if (!winners.length || !losers.length) return;
+  const ratings = new Map();
+  for (const player of [...winners, ...losers]) {
+    const stats = await getUserStats(player.id);
+    ratings.set(player.id, stats.mmr || 1000);
+  }
+  const avg = (arr) =>
+    arr.reduce((sum, p) => sum + (ratings.get(p.id) || 1000), 0) / arr.length;
+  const winnersAvg = avg(winners);
+  const losersAvg = avg(losers);
+
+  for (const player of winners) {
+    const rating = ratings.get(player.id) || 1000;
+    const delta = computeEloDelta(rating, losersAvg, 1);
+    await updateUserMmr(player.id, rating + delta);
+  }
+  for (const player of losers) {
+    const rating = ratings.get(player.id) || 1000;
+    const delta = computeEloDelta(rating, winnersAvg, 0);
+    await updateUserMmr(player.id, rating + delta);
+  }
 }
 
 async function incrementUserRoleStats(userId, role, winsDelta, lossesDelta, gamesDelta) {
@@ -2144,6 +2544,13 @@ const ACTIONS = {
   DM_HELP_ADD: "dm_help_add",
   DM_HELP_COMMANDS: "dm_help_commands",
   DM_HELP_SETTINGS: "dm_help_settings",
+  PREFS_OPEN: "prefs_open",
+  EXPERIENCE_NOVICE: "experience_novice",
+  EXPERIENCE_EXPERIENCED: "experience_experienced",
+  LEADERBOARD_SHOW: "leaderboard_show",
+  LEADERBOARD_HIDE: "leaderboard_hide",
+  MODE_SUGGEST_ACCEPT: "mode_suggest_accept",
+  MODE_SUGGEST_DECLINE: "mode_suggest_decline",
   LANG_SELECT_EN: "lang_select_en",
   LANG_SELECT_RU: "lang_select_ru",
   PAGE_PREV: "page_prev",
@@ -2165,6 +2572,9 @@ const ACTIONS = {
   MY_CHANNELS_PAGE_PREV: "my_channels_page_prev",
   MY_CHANNELS_PAGE_NEXT: "my_channels_page_next",
   CHANNEL_EDIT_OPEN: "channel_edit_open",
+  LEADERBOARD_OPEN: "leaderboard_open",
+  LEADERBOARD_PAGE_PREV: "leaderboard_page_prev",
+  LEADERBOARD_PAGE_NEXT: "leaderboard_page_next",
   FAQ_OPEN: "faq_open",
   FAQ_TOPIC: "faq_topic",
   FAQ_BACK: "faq_back",
@@ -3583,6 +3993,16 @@ function buildTelegramDmHelpKeyboard(lang) {
         buildTelegramCallback(ACTIONS.MY_CHANNELS_OPEN, "")
       ),
       Markup.button.callback(
+        t(lang, "button.leaderboard"),
+        buildTelegramCallback(ACTIONS.LEADERBOARD_OPEN, "")
+      ),
+    ],
+    [
+      Markup.button.callback(
+        t(lang, "button.preferences"),
+        buildTelegramCallback(ACTIONS.PREFS_OPEN, "")
+      ),
+      Markup.button.callback(
         t(lang, "button.faq"),
         buildTelegramCallback(ACTIONS.FAQ_OPEN, "")
       ),
@@ -3827,6 +4247,9 @@ async function buildHomeBlocksDetailed(client, userId, lang) {
     },
   });
 
+  const experienceMode = await getUserExperienceMode(userId);
+  const isNovice = experienceMode === "novice";
+
   const formatHomeTarget = async (targetId) => {
     if (!targetId) return null;
     if (targetId === SPECIAL_TARGETS.ABSTAIN) return t(lang, "button.abstain");
@@ -3910,7 +4333,14 @@ async function buildHomeBlocksDetailed(client, userId, lang) {
         text: { type: "mrkdwn", text: actionLine },
       });
     }
+    if (isNovice) return blocks;
+  }
 
+  if (!game && isNovice) {
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: t(lang, "home.current_none") },
+    });
     return blocks;
   }
 
@@ -3931,11 +4361,12 @@ async function buildHomeBlocksDetailed(client, userId, lang) {
       text: `*${t(lang, "home.role_stats_title")}*\n${roleLines}`,
     },
   });
-
-  blocks.push({
-    type: "section",
-    text: { type: "mrkdwn", text: t(lang, "home.current_none") },
-  });
+  if (!game) {
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: t(lang, "home.current_none") },
+    });
+  }
 
   const history = game?.history?.nights || [];
   const historyLines =
@@ -4004,6 +4435,8 @@ async function buildHomeViewBilingualDetailed(client, userId, primaryLang) {
 }
 
 async function buildTelegramHomeText(userId, lang) {
+  const experienceMode = await getUserExperienceMode(userId);
+  const isNovice = experienceMode === "novice";
   const stats = await getUserStats(userId);
   const roleStats = await getUserRoleStats(userId);
   const roleLines =
@@ -4037,6 +4470,71 @@ async function buildTelegramHomeText(userId, lang) {
       status,
       role,
     });
+  }
+
+  let actionLine = "";
+  if (currentGame && (currentGame.state === "day" || currentGame.state === "night")) {
+    const formatTarget = (targetId) => {
+      if (!targetId) return null;
+      if (targetId === SPECIAL_TARGETS.ABSTAIN) return t(lang, "button.abstain");
+      if (targetId === SPECIAL_TARGETS.NO_KILL) return t(lang, "button.no_kill");
+      return mention(targetId);
+    };
+    if (currentGame.state === "day") {
+      const voteTarget = formatTarget(currentGame.day?.votes?.[userId]);
+      actionLine = voteTarget
+        ? t(lang, "home.your_vote", { target: voteTarget })
+        : t(lang, "home.your_vote_none");
+    } else {
+      const roleKey = currentGame.players?.[userId]?.role;
+      let target = null;
+      if (roleKey === "mafia" || roleKey === "godfather") {
+        target = formatTarget(currentGame.night?.mafiaVotes?.[userId]);
+      } else if (roleKey === "doctor") {
+        target = formatTarget(currentGame.night?.doctorSave);
+      } else if (currentGame.roles?.detectiveId === userId) {
+        if (currentGame.night?.detectiveKill) {
+          const tgt = formatTarget(currentGame.night.detectiveKill);
+          target = tgt
+            ? `${t(lang, "button.detective_kill")} ${tgt}`
+            : null;
+        } else if (currentGame.night?.detectiveCheck) {
+          const tgt = formatTarget(currentGame.night.detectiveCheck);
+          target = tgt
+            ? `${t(lang, "button.detective_check")} ${tgt}`
+            : null;
+        }
+      } else if (roleKey === "bodyguard") {
+        target = formatTarget(currentGame.night?.bodyguardProtect);
+      } else if (roleKey === "bum") {
+        target = formatTarget(currentGame.night?.bumVisit);
+      } else if (roleKey === "lawyer") {
+        target = formatTarget(currentGame.night?.lawyerProtect);
+      } else if (roleKey === "stalker") {
+        target = formatTarget(currentGame.night?.stalkerKill);
+      }
+      actionLine = target
+        ? t(lang, "home.your_action", { target })
+        : t(lang, "home.your_action_none");
+    }
+  }
+
+  if (isNovice) {
+    let text =
+      `${t(lang, "home.title")}\n` +
+      `\n${t(lang, "home.stats_title")}\n` +
+      t(lang, "home.stats_line", {
+        games: stats.games,
+        wins: stats.wins,
+        losses: stats.losses,
+        rate: computeWinRate(stats),
+      }) +
+      `\n\n${t(lang, "home.current_title")}\n` +
+      currentLine;
+    if (actionLine) {
+      text += `\n\n${actionLine}`;
+    }
+    return text;
   }
 
   let historyLines = t(lang, "home.history_empty");
@@ -4265,6 +4763,11 @@ function buildDmHelpBlocks(lang, text) {
           text: { type: "plain_text", text: t(lang, "button.help_settings") },
           action_id: ACTIONS.DM_HELP_SETTINGS,
         },
+      ],
+    },
+    {
+      type: "actions",
+      elements: [
         {
           type: "button",
           text: { type: "plain_text", text: t(lang, "button.find_games") },
@@ -4277,12 +4780,369 @@ function buildDmHelpBlocks(lang, text) {
         },
         {
           type: "button",
+          text: { type: "plain_text", text: t(lang, "button.leaderboard") },
+          action_id: ACTIONS.LEADERBOARD_OPEN,
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: t(lang, "button.preferences") },
+          action_id: ACTIONS.PREFS_OPEN,
+        },
+        {
+          type: "button",
           text: { type: "plain_text", text: t(lang, "button.faq") },
           action_id: ACTIONS.FAQ_OPEN,
         },
       ],
     },
   ];
+}
+
+function buildExperienceModeBlocks(lang, context = "onboarding") {
+  return [
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: t(lang, "onboarding.experience_question") },
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: t(lang, "button.mode_novice") },
+          action_id: ACTIONS.EXPERIENCE_NOVICE,
+          value: context,
+          style: "primary",
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: t(lang, "button.mode_experienced") },
+          action_id: ACTIONS.EXPERIENCE_EXPERIENCED,
+          value: context,
+        },
+      ],
+    },
+  ];
+}
+
+function buildLeaderboardVisibilityBlocks(lang, context = "onboarding") {
+  return [
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: t(lang, "onboarding.leaderboard_question") },
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: t(lang, "button.leaderboard_show") },
+          action_id: ACTIONS.LEADERBOARD_SHOW,
+          value: context,
+          style: "primary",
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: t(lang, "button.leaderboard_hide") },
+          action_id: ACTIONS.LEADERBOARD_HIDE,
+          value: context,
+        },
+      ],
+    },
+  ];
+}
+
+async function buildUserPreferencesBlocks(lang, userId) {
+  const mode = await getUserExperienceMode(userId);
+  const visible = await getLeaderboardVisible(userId);
+  const modeLabel =
+    mode === "experienced"
+      ? t(lang, "prefs.mode_experienced")
+      : t(lang, "prefs.mode_novice");
+  const lbLabel = visible
+    ? t(lang, "prefs.leaderboard_on")
+    : t(lang, "prefs.leaderboard_off");
+  const text =
+    `*${t(lang, "prefs.title")}*\n` +
+    t(lang, "prefs.mode_label", { mode: modeLabel }) +
+    "\n" +
+    t(lang, "prefs.leaderboard_label", { status: lbLabel });
+  return [
+    {
+      type: "section",
+      text: { type: "mrkdwn", text },
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: t(lang, "button.mode_novice") },
+          action_id: ACTIONS.EXPERIENCE_NOVICE,
+          value: "prefs",
+          style: mode === "novice" ? "primary" : undefined,
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: t(lang, "button.mode_experienced") },
+          action_id: ACTIONS.EXPERIENCE_EXPERIENCED,
+          value: "prefs",
+          style: mode === "experienced" ? "primary" : undefined,
+        },
+      ],
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: t(lang, "button.leaderboard_show") },
+          action_id: ACTIONS.LEADERBOARD_SHOW,
+          value: "prefs",
+          style: visible ? "primary" : undefined,
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: t(lang, "button.leaderboard_hide") },
+          action_id: ACTIONS.LEADERBOARD_HIDE,
+          value: "prefs",
+          style: !visible ? "primary" : undefined,
+        },
+      ],
+    },
+  ];
+}
+
+function buildModeSuggestionBlocks(lang, games) {
+  return [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: t(lang, "mode.switch_suggestion", { games }),
+      },
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: t(lang, "button.mode_switch") },
+          action_id: ACTIONS.MODE_SUGGEST_ACCEPT,
+          style: "primary",
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: t(lang, "button.mode_keep") },
+          action_id: ACTIONS.MODE_SUGGEST_DECLINE,
+        },
+      ],
+    },
+  ];
+}
+
+function buildTelegramExperienceKeyboard(context = "onboarding", lang = "en") {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback(
+        t(lang, "button.mode_novice"),
+        buildTelegramCallback(ACTIONS.EXPERIENCE_NOVICE, context)
+      ),
+      Markup.button.callback(
+        t(lang, "button.mode_experienced"),
+        buildTelegramCallback(ACTIONS.EXPERIENCE_EXPERIENCED, context)
+      ),
+    ],
+  ]).reply_markup;
+}
+
+function buildTelegramLeaderboardVisibilityKeyboard(context = "onboarding", lang = "en") {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback(
+        t(lang, "button.leaderboard_show"),
+        buildTelegramCallback(ACTIONS.LEADERBOARD_SHOW, context)
+      ),
+      Markup.button.callback(
+        t(lang, "button.leaderboard_hide"),
+        buildTelegramCallback(ACTIONS.LEADERBOARD_HIDE, context)
+      ),
+    ],
+  ]).reply_markup;
+}
+
+async function buildTelegramPreferencesMessage(userId, lang) {
+  const mode = await getUserExperienceMode(userId);
+  const visible = await getLeaderboardVisible(userId);
+  const modeLabel =
+    mode === "experienced"
+      ? t(lang, "prefs.mode_experienced")
+      : t(lang, "prefs.mode_novice");
+  const lbLabel = visible
+    ? t(lang, "prefs.leaderboard_on")
+    : t(lang, "prefs.leaderboard_off");
+  const text =
+    `${t(lang, "prefs.title")}\n` +
+    `${t(lang, "prefs.mode_label", { mode: modeLabel })}\n` +
+    `${t(lang, "prefs.leaderboard_label", { status: lbLabel })}`;
+  const reply_markup = Markup.inlineKeyboard([
+    [
+      Markup.button.callback(
+        t(lang, "button.mode_novice"),
+        buildTelegramCallback(ACTIONS.EXPERIENCE_NOVICE, "prefs")
+      ),
+      Markup.button.callback(
+        t(lang, "button.mode_experienced"),
+        buildTelegramCallback(ACTIONS.EXPERIENCE_EXPERIENCED, "prefs")
+      ),
+    ],
+    [
+      Markup.button.callback(
+        t(lang, "button.leaderboard_show"),
+        buildTelegramCallback(ACTIONS.LEADERBOARD_SHOW, "prefs")
+      ),
+      Markup.button.callback(
+        t(lang, "button.leaderboard_hide"),
+        buildTelegramCallback(ACTIONS.LEADERBOARD_HIDE, "prefs")
+      ),
+    ],
+  ]).reply_markup;
+  return { text, reply_markup };
+}
+
+function buildTelegramModeSuggestionKeyboard(lang) {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback(
+        t(lang, "button.mode_switch"),
+        buildTelegramCallback(ACTIONS.MODE_SUGGEST_ACCEPT, "mode")
+      ),
+      Markup.button.callback(
+        t(lang, "button.mode_keep"),
+        buildTelegramCallback(ACTIONS.MODE_SUGGEST_DECLINE, "mode")
+      ),
+    ],
+  ]).reply_markup;
+}
+
+function parseLeaderboardContext(action) {
+  const blockId = action?.block_id || "";
+  if (!blockId.startsWith("leaderboard|")) return null;
+  const parts = blockId.split("|");
+  return { page: Number(parts[1]) || 0 };
+}
+
+async function buildLeaderboardEntries(client, lang, page) {
+  const total = await db.countLeaderboard();
+  const totalPages = Math.max(1, Math.ceil(total / LEADERBOARD_PAGE_SIZE));
+  const safePage = Math.max(0, Math.min(totalPages - 1, page));
+  const rows = await db.listLeaderboard(
+    LEADERBOARD_PAGE_SIZE,
+    safePage * LEADERBOARD_PAGE_SIZE
+  );
+  const lines = [];
+  for (let idx = 0; idx < rows.length; idx += 1) {
+    const row = rows[idx];
+    const rank = safePage * LEADERBOARD_PAGE_SIZE + idx + 1;
+    let name = row.display_name;
+    if (!name) {
+      if (client) {
+        name = await getUserLabel(client, row.user_id);
+      } else {
+        name = row.user_id;
+      }
+    }
+    const stats = normalizeStatsRow(row);
+    lines.push(
+      t(lang, "leaderboard.line", {
+        rank,
+        name,
+        mmr: stats.mmr,
+        wins: stats.wins,
+        losses: stats.losses,
+        rate: computeWinRate(stats),
+      })
+    );
+  }
+  return { total, totalPages, safePage, rows, lines };
+}
+
+async function buildLeaderboardBlocks(client, lang, page) {
+  const data = await buildLeaderboardEntries(client, lang, page);
+  const title = `*${t(lang, "leaderboard.title")}*`;
+  const body =
+    data.lines.length > 0 ? data.lines.join("\n") : t(lang, "leaderboard.empty");
+  const blocks = [
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: `${title}\n${body}` },
+    },
+  ];
+  if (data.totalPages > 1) {
+    blocks.push({
+      type: "actions",
+      block_id: `leaderboard|${data.safePage}`,
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: t(lang, "button.prev") },
+          action_id: ACTIONS.LEADERBOARD_PAGE_PREV,
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: t(lang, "button.next") },
+          action_id: ACTIONS.LEADERBOARD_PAGE_NEXT,
+        },
+      ],
+    });
+    blocks.push({
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: t(lang, "leaderboard.page", {
+            page: data.safePage + 1,
+            total: data.totalPages,
+          }),
+        },
+      ],
+    });
+  }
+  return blocks;
+}
+
+async function buildTelegramLeaderboardMessage(lang, page) {
+  const data = await buildLeaderboardEntries(null, lang, page);
+  const header = t(lang, "leaderboard.title");
+  const body =
+    data.lines.length > 0 ? data.lines.join("\n") : t(lang, "leaderboard.empty");
+  const text = `${header}\n${body}`;
+  const buttons = [];
+  if (data.totalPages > 1) {
+    buttons.push([
+      Markup.button.callback(
+        t(lang, "button.prev"),
+        buildTelegramCallback(ACTIONS.LEADERBOARD_PAGE_PREV, "", data.safePage)
+      ),
+      Markup.button.callback(
+        t(lang, "button.next"),
+        buildTelegramCallback(ACTIONS.LEADERBOARD_PAGE_NEXT, "", data.safePage)
+      ),
+    ]);
+    buttons.push([
+      Markup.button.callback(
+        t(lang, "leaderboard.page", {
+          page: data.safePage + 1,
+          total: data.totalPages,
+        }),
+        buildTelegramCallback("noop", "", data.safePage)
+      ),
+    ]);
+  }
+  const reply_markup = buttons.length
+    ? Markup.inlineKeyboard(buttons).reply_markup
+    : undefined;
+  return { text, reply_markup };
 }
 
 function buildDevPanelBlocks(lang, enabled) {
@@ -6295,6 +7155,8 @@ async function endGameWithWinner(client, game, winner) {
   );
 
   const players = Object.values(game.players || {});
+  const winners = [];
+  const losers = [];
   for (const player of players) {
     if (player.isTest) continue;
     const role = player.role || "town";
@@ -6309,11 +7171,20 @@ async function endGameWithWinner(client, game, winner) {
     } else if (winner === "jester") {
       isWin = role === "jester";
     }
+    if (isWin) winners.push(player);
+    else losers.push(player);
     await updateUserStats(player.id, isWin);
     await updateUserChannelStats(player.id, game.channelId, isWin);
     if (role !== "stalker") {
       await updateUserRoleStats(player.id, role, isWin);
     }
+  }
+
+  await updateMmrForGame(game, winners, losers);
+
+  for (const player of players) {
+    if (player.isTest) continue;
+    await maybeSuggestExperienceSwitch(client, player.id);
   }
 
   await finalizeDashboard(client, game);
@@ -6712,7 +7583,7 @@ async function sendNightPrompts(client, game) {
     if (mafiaChoices.length === 0) continue;
     const lang = await getUserLang(mafiaId);
 
-    const promptText = t(lang, "prompt.mafia", {
+    const promptText = await getExperienceText(lang, mafiaId, "prompt.mafia", {
       channel: channelMention(game.channelId),
     });
     const extraButtons = [];
@@ -6747,9 +7618,14 @@ async function sendNightPrompts(client, game) {
   if (game.roles.doctorId && isPlayerAlive(game, game.roles.doctorId)) {
     if (!isTestUserId(game.roles.doctorId)) {
       const lang = await getUserLang(game.roles.doctorId);
-      const promptText = t(lang, "prompt.doctor", {
-        channel: channelMention(game.channelId),
-      });
+      const promptText = await getExperienceText(
+        lang,
+        game.roles.doctorId,
+        "prompt.doctor",
+        {
+          channel: channelMention(game.channelId),
+        }
+      );
       const blocks = buildPlayerButtonBlocks({
         channelId: game.channelId,
         actionId: ACTIONS.DOCTOR_SAVE,
@@ -6774,9 +7650,14 @@ async function sendNightPrompts(client, game) {
   if (game.roles.detectiveId && isPlayerAlive(game, game.roles.detectiveId)) {
     if (!isTestUserId(game.roles.detectiveId)) {
       const lang = await getUserLang(game.roles.detectiveId);
-      const promptText = t(lang, "prompt.detective_mode", {
-        channel: channelMention(game.channelId),
-      });
+      const promptText = await getExperienceText(
+        lang,
+        game.roles.detectiveId,
+        "prompt.detective_mode",
+        {
+          channel: channelMention(game.channelId),
+        }
+      );
       const blocks = buildDetectiveModeBlocks(lang, game.channelId, promptText);
       await sendEphemeralActionPanel(
         client,
@@ -6792,9 +7673,14 @@ async function sendNightPrompts(client, game) {
   if (game.roles.bodyguardId && isPlayerAlive(game, game.roles.bodyguardId)) {
     if (!isTestUserId(game.roles.bodyguardId)) {
       const lang = await getUserLang(game.roles.bodyguardId);
-      const promptText = t(lang, "prompt.bodyguard", {
-        channel: channelMention(game.channelId),
-      });
+      const promptText = await getExperienceText(
+        lang,
+        game.roles.bodyguardId,
+        "prompt.bodyguard",
+        {
+          channel: channelMention(game.channelId),
+        }
+      );
       const blocks = buildPlayerButtonBlocks({
         channelId: game.channelId,
         actionId: ACTIONS.BODYGUARD_PROTECT,
@@ -6819,9 +7705,14 @@ async function sendNightPrompts(client, game) {
   if (game.roles.bumId && isPlayerAlive(game, game.roles.bumId)) {
     if (!isTestUserId(game.roles.bumId)) {
       const lang = await getUserLang(game.roles.bumId);
-      const promptText = t(lang, "prompt.bum", {
-        channel: channelMention(game.channelId),
-      });
+      const promptText = await getExperienceText(
+        lang,
+        game.roles.bumId,
+        "prompt.bum",
+        {
+          channel: channelMention(game.channelId),
+        }
+      );
       const blocks = buildPlayerButtonBlocks({
         channelId: game.channelId,
         actionId: ACTIONS.BUM_VISIT,
@@ -6845,9 +7736,14 @@ async function sendNightPrompts(client, game) {
   if (game.roles.lawyerId && isPlayerAlive(game, game.roles.lawyerId)) {
     if (!isTestUserId(game.roles.lawyerId)) {
       const lang = await getUserLang(game.roles.lawyerId);
-      const promptText = t(lang, "prompt.lawyer", {
-        channel: channelMention(game.channelId),
-      });
+      const promptText = await getExperienceText(
+        lang,
+        game.roles.lawyerId,
+        "prompt.lawyer",
+        {
+          channel: channelMention(game.channelId),
+        }
+      );
       const blocks = buildPlayerButtonBlocks({
         channelId: game.channelId,
         actionId: ACTIONS.LAWYER_PROTECT,
@@ -6875,10 +7771,15 @@ async function sendNightPrompts(client, game) {
       const roleText = targetRole
         ? roleLabel(targetRole, lang)
         : t(lang, "home.role_unknown");
-      const promptText = t(lang, "prompt.stalker", {
-        channel: channelMention(game.channelId),
-        role: roleText,
-      });
+      const promptText = await getExperienceText(
+        lang,
+        game.roles.stalkerId,
+        "prompt.stalker",
+        {
+          channel: channelMention(game.channelId),
+          role: roleText,
+        }
+      );
       const stalkerTargets = aliveIds.filter(
         (id) => id !== game.roles.stalkerId
       );
@@ -6919,7 +7820,7 @@ async function sendNightPromptsTelegram(game) {
     if (isTestUserId(mafiaId)) continue;
     if (!mafiaChoices.length) continue;
     const lang = await getUserLang(mafiaId);
-    const promptText = t(lang, "prompt.mafia", {
+    const promptText = await getExperienceText(lang, mafiaId, "prompt.mafia", {
       channel: channelMention(game.channelId),
     });
     const extraButtons = [];
@@ -6945,9 +7846,14 @@ async function sendNightPromptsTelegram(game) {
   if (game.roles.doctorId && isPlayerAlive(game, game.roles.doctorId)) {
     if (!isTestUserId(game.roles.doctorId)) {
       const lang = await getUserLang(game.roles.doctorId);
-      const promptText = t(lang, "prompt.doctor", {
-        channel: channelMention(game.channelId),
-      });
+      const promptText = await getExperienceText(
+        lang,
+        game.roles.doctorId,
+        "prompt.doctor",
+        {
+          channel: channelMention(game.channelId),
+        }
+      );
       const reply_markup = buildTelegramPlayerKeyboard({
         chatId: rawChatId,
         actionId: ACTIONS.DOCTOR_SAVE,
@@ -6965,9 +7871,14 @@ async function sendNightPromptsTelegram(game) {
   if (game.roles.detectiveId && isPlayerAlive(game, game.roles.detectiveId)) {
     if (!isTestUserId(game.roles.detectiveId)) {
       const lang = await getUserLang(game.roles.detectiveId);
-      const promptText = t(lang, "prompt.detective_mode", {
-        channel: channelMention(game.channelId),
-      });
+      const promptText = await getExperienceText(
+        lang,
+        game.roles.detectiveId,
+        "prompt.detective_mode",
+        {
+          channel: channelMention(game.channelId),
+        }
+      );
       const reply_markup = buildTelegramDetectiveModeKeyboard(lang, rawChatId);
       await sendInteractiveDM(null, game.roles.detectiveId, promptText, {
         reply_markup,
@@ -6978,9 +7889,14 @@ async function sendNightPromptsTelegram(game) {
   if (game.roles.bodyguardId && isPlayerAlive(game, game.roles.bodyguardId)) {
     if (!isTestUserId(game.roles.bodyguardId)) {
       const lang = await getUserLang(game.roles.bodyguardId);
-      const promptText = t(lang, "prompt.bodyguard", {
-        channel: channelMention(game.channelId),
-      });
+      const promptText = await getExperienceText(
+        lang,
+        game.roles.bodyguardId,
+        "prompt.bodyguard",
+        {
+          channel: channelMention(game.channelId),
+        }
+      );
       const reply_markup = buildTelegramPlayerKeyboard({
         chatId: rawChatId,
         actionId: ACTIONS.BODYGUARD_PROTECT,
@@ -6998,9 +7914,14 @@ async function sendNightPromptsTelegram(game) {
   if (game.roles.bumId && isPlayerAlive(game, game.roles.bumId)) {
     if (!isTestUserId(game.roles.bumId)) {
       const lang = await getUserLang(game.roles.bumId);
-      const promptText = t(lang, "prompt.bum", {
-        channel: channelMention(game.channelId),
-      });
+      const promptText = await getExperienceText(
+        lang,
+        game.roles.bumId,
+        "prompt.bum",
+        {
+          channel: channelMention(game.channelId),
+        }
+      );
       const reply_markup = buildTelegramPlayerKeyboard({
         chatId: rawChatId,
         actionId: ACTIONS.BUM_VISIT,
@@ -7018,9 +7939,14 @@ async function sendNightPromptsTelegram(game) {
   if (game.roles.lawyerId && isPlayerAlive(game, game.roles.lawyerId)) {
     if (!isTestUserId(game.roles.lawyerId)) {
       const lang = await getUserLang(game.roles.lawyerId);
-      const promptText = t(lang, "prompt.lawyer", {
-        channel: channelMention(game.channelId),
-      });
+      const promptText = await getExperienceText(
+        lang,
+        game.roles.lawyerId,
+        "prompt.lawyer",
+        {
+          channel: channelMention(game.channelId),
+        }
+      );
       const reply_markup = buildTelegramPlayerKeyboard({
         chatId: rawChatId,
         actionId: ACTIONS.LAWYER_PROTECT,
@@ -7042,10 +7968,15 @@ async function sendNightPromptsTelegram(game) {
       const roleText = targetRole
         ? roleLabel(targetRole, lang)
         : t(lang, "home.role_unknown");
-      const promptText = t(lang, "prompt.stalker", {
-        channel: channelMention(game.channelId),
-        role: roleText,
-      });
+      const promptText = await getExperienceText(
+        lang,
+        game.roles.stalkerId,
+        "prompt.stalker",
+        {
+          channel: channelMention(game.channelId),
+          role: roleText,
+        }
+      );
       const stalkerTargets = aliveIds.filter(
         (id) => id !== game.roles.stalkerId
       );
@@ -7077,7 +8008,7 @@ async function sendDayPrompts(client, game) {
   for (const userId of aliveIds) {
     if (isTestUserId(userId)) continue;
     const lang = await getUserLang(userId);
-    const promptText = t(lang, "prompt.day", {
+    const promptText = await getExperienceText(lang, userId, "prompt.day", {
       channel: channelMention(game.channelId),
     });
     const extraButtons = [];
@@ -7119,7 +8050,7 @@ async function sendDayPromptsTelegram(game) {
   for (const userId of aliveIds) {
     if (isTestUserId(userId)) continue;
     const lang = await getUserLang(userId);
-    const promptText = t(lang, "prompt.day", {
+    const promptText = await getExperienceText(lang, userId, "prompt.day", {
       channel: channelMention(game.channelId),
     });
     const extraButtons = [];
@@ -7245,31 +8176,28 @@ function getTargetsForAction(game, actionType, actorId) {
   return [];
 }
 
-function getPromptTextForAction(lang, game, actionType) {
+async function getPromptTextForAction(lang, game, actionType, userId) {
   const channel = channelMention(game.channelId);
-  if (actionType === ACTIONS.MAFIA_VOTE)
-    return t(lang, "prompt.mafia", { channel });
-  if (actionType === ACTIONS.DOCTOR_SAVE)
-    return t(lang, "prompt.doctor", { channel });
-  if (actionType === ACTIONS.DETECTIVE_CHECK)
-    return t(lang, "prompt.detective", { channel });
-  if (actionType === ACTIONS.DETECTIVE_KILL)
-    return t(lang, "prompt.detective_kill", { channel });
-  if (actionType === ACTIONS.BODYGUARD_PROTECT)
-    return t(lang, "prompt.bodyguard", { channel });
-  if (actionType === ACTIONS.BUM_VISIT)
-    return t(lang, "prompt.bum", { channel });
-  if (actionType === ACTIONS.LAWYER_PROTECT)
-    return t(lang, "prompt.lawyer", { channel });
+  let key = null;
+  const params = { channel };
+  if (actionType === ACTIONS.MAFIA_VOTE) key = "prompt.mafia";
+  if (actionType === ACTIONS.DOCTOR_SAVE) key = "prompt.doctor";
+  if (actionType === ACTIONS.DETECTIVE_CHECK) key = "prompt.detective";
+  if (actionType === ACTIONS.DETECTIVE_KILL) key = "prompt.detective_kill";
+  if (actionType === ACTIONS.BODYGUARD_PROTECT) key = "prompt.bodyguard";
+  if (actionType === ACTIONS.BUM_VISIT) key = "prompt.bum";
+  if (actionType === ACTIONS.LAWYER_PROTECT) key = "prompt.lawyer";
   if (actionType === ACTIONS.STALKER_KILL) {
+    key = "prompt.stalker";
     const targetRole = game.stalker?.targetRole;
     const roleText = targetRole
       ? roleLabel(targetRole, lang)
       : t(lang, "home.role_unknown");
-    return t(lang, "prompt.stalker", { channel, role: roleText });
+    params.role = roleText;
   }
-  if (actionType === ACTIONS.DAY_VOTE) return t(lang, "prompt.day", { channel });
-  return t(lang, "action.failed");
+  if (actionType === ACTIONS.DAY_VOTE) key = "prompt.day";
+  if (!key) return t(lang, "action.failed");
+  return await getExperienceText(lang, userId, key, params);
 }
 
 app.event("app_mention", async ({ event, say, client }) => {
@@ -7686,6 +8614,7 @@ app.event("app_home_opened", async ({ event, client }) => {
   const userId = event.user;
   if (!userId) return;
   await publishHomeForUser(client, userId);
+  await maybeSendExperiencePrompt(client, userId);
 });
 
 app.event("member_joined_channel", async ({ event, client }) => {
@@ -7875,7 +8804,7 @@ app.action(
       }
 
       const choices = await buildUserChoices(client, targetIds);
-      const text = getPromptTextForAction(actorLang, game, nextAction);
+      const text = await getPromptTextForAction(actorLang, game, nextAction, actorId);
       const blocks = buildPlayerButtonBlocks({
         channelId: game.channelId,
         actionId: nextAction,
@@ -8565,7 +9494,7 @@ app.action(
       );
       const direction = action.action_id === ACTIONS.PAGE_NEXT ? 1 : -1;
       const newPage = Math.max(0, Math.min(totalPages - 1, page + direction));
-      const text = getPromptTextForAction(actorLang, game, actionType);
+      const text = await getPromptTextForAction(actorLang, game, actionType, actorId);
       const extraButtons = [];
       if (actionType === ACTIONS.DAY_VOTE) {
         if (game.config.allowAbstain) {
@@ -8834,6 +9763,7 @@ app.action(
         ? t("ru", "dm.lang_set_ru")
         : t("en", "dm.lang_set_en");
     await updateActionMessage(client, body, text);
+    await maybeSendExperiencePrompt(client, userId);
   }
 );
 
@@ -8870,15 +9800,120 @@ app.action(
     await ack();
     const userId = body.user.id;
     const lang = await getUserLang(userId);
-    let text = t(lang, "dm.help_intro");
-    if (action.action_id === ACTIONS.DM_HELP_ADD) text = t(lang, "dm.help_add");
+    let text = await getHelpText(lang, userId, "dm.help_intro");
+    if (action.action_id === ACTIONS.DM_HELP_ADD)
+      text = await getHelpText(lang, userId, "dm.help_add");
     if (action.action_id === ACTIONS.DM_HELP_COMMANDS)
-      text = t(lang, "dm.help_commands");
+      text = await getHelpText(lang, userId, "dm.help_commands");
     if (action.action_id === ACTIONS.DM_HELP_SETTINGS)
-      text = t(lang, "dm.help_settings");
+      text = await getHelpText(lang, userId, "dm.help_settings");
     text = withDevHint(text, lang, userId);
 
     await updateActionMessage(client, body, text, buildDmHelpBlocks(lang, text));
+  }
+);
+
+app.action(ACTIONS.PREFS_OPEN, async ({ ack, body, client }) => {
+  await ack();
+  const userId = body.user.id;
+  const lang = await getUserLang(userId);
+  const blocks = await buildUserPreferencesBlocks(lang, userId);
+  await updateActionMessage(
+    client,
+    body,
+    t(lang, "prefs.title"),
+    blocks
+  );
+});
+
+app.action(
+  /^(experience_novice|experience_experienced)$/,
+  async ({ ack, body, action, client }) => {
+    await ack();
+    const userId = body.user.id;
+    const lang = await getUserLang(userId);
+    const mode =
+      action.action_id === ACTIONS.EXPERIENCE_EXPERIENCED
+        ? "experienced"
+        : "novice";
+    await setUserExperienceMode(userId, mode);
+    await setExperiencePromptedAt(userId, null);
+    const context = action.value || "onboarding";
+    if (context === "prefs") {
+      const blocks = await buildUserPreferencesBlocks(lang, userId);
+      await updateActionMessage(client, body, t(lang, "prefs.saved"), blocks);
+      return;
+    }
+    const nextText =
+      mode === "experienced"
+        ? t(lang, "onboarding.experience_set_experienced")
+        : t(lang, "onboarding.experience_set_novice");
+    await updateActionMessage(
+      client,
+      body,
+      nextText,
+      buildLeaderboardVisibilityBlocks(lang, "onboarding")
+    );
+  }
+);
+
+app.action(
+  /^(leaderboard_show|leaderboard_hide)$/,
+  async ({ ack, body, action, client }) => {
+    await ack();
+    const userId = body.user.id;
+    const lang = await getUserLang(userId);
+    const visible = action.action_id === ACTIONS.LEADERBOARD_SHOW;
+    await setLeaderboardVisible(userId, visible);
+    const context = action.value || "onboarding";
+    if (context === "prefs") {
+      const blocks = await buildUserPreferencesBlocks(lang, userId);
+      await updateActionMessage(client, body, t(lang, "prefs.saved"), blocks);
+      return;
+    }
+    const text = visible
+      ? t(lang, "onboarding.leaderboard_set_show")
+      : t(lang, "onboarding.leaderboard_set_hide");
+    await updateActionMessage(client, body, text);
+  }
+);
+
+app.action(
+  /^(mode_suggest_accept|mode_suggest_decline)$/,
+  async ({ ack, body, action, client }) => {
+    await ack();
+    const userId = body.user.id;
+    const lang = await getUserLang(userId);
+    if (action.action_id === ACTIONS.MODE_SUGGEST_ACCEPT) {
+      await setUserExperienceMode(userId, "experienced");
+      await setExperiencePromptedAt(userId, now());
+      await updateActionMessage(client, body, t(lang, "mode.switched"));
+      return;
+    }
+    await setExperiencePromptedAt(userId, now());
+    await updateActionMessage(client, body, t(lang, "mode.kept"));
+  }
+);
+
+app.action(ACTIONS.LEADERBOARD_OPEN, async ({ ack, body, client }) => {
+  await ack();
+  const userId = body.user.id;
+  const lang = await getUserLang(userId);
+  const blocks = await buildLeaderboardBlocks(client, lang, 0);
+  await updateActionMessage(client, body, t(lang, "leaderboard.title"), blocks);
+});
+
+app.action(
+  /^(leaderboard_page_prev|leaderboard_page_next)$/,
+  async ({ ack, body, action, client }) => {
+    await ack();
+    const userId = body.user.id;
+    const lang = await getUserLang(userId);
+    const ctx = parseLeaderboardContext(action) || { page: 0 };
+    const delta = action.action_id === ACTIONS.LEADERBOARD_PAGE_NEXT ? 1 : -1;
+    const page = Math.max(0, ctx.page + delta);
+    const blocks = await buildLeaderboardBlocks(client, lang, page);
+    await updateActionMessage(client, body, t(lang, "leaderboard.title"), blocks);
   }
 );
 
@@ -9360,6 +10395,7 @@ app.event("message", async ({ event, client }) => {
           ? t("ru", "dm.lang_set_ru")
           : t("en", "dm.lang_set_en"),
     });
+    await maybeSendExperiencePrompt(client, userId);
     return;
   }
 
@@ -9535,9 +10571,45 @@ app.event("message", async ({ event, client }) => {
           channel: event.channel,
           text: responseText,
         });
-      }
+    }
+    return;
+  }
+
+  if (command === "mode") {
+    const choice = (args[1] || "").toLowerCase();
+    if (!["novice", "experienced"].includes(choice)) {
+      await client.chat.postMessage({
+        channel: event.channel,
+        text: t(userLang, "mode.usage"),
+      });
       return;
     }
+    await setUserExperienceMode(userId, choice);
+    await setExperiencePromptedAt(userId, null);
+    await client.chat.postMessage({
+      channel: event.channel,
+      text:
+        choice === "experienced"
+          ? t(userLang, "onboarding.experience_set_experienced")
+          : t(userLang, "onboarding.experience_set_novice"),
+    });
+    return;
+  }
+
+  if (command !== "dev" && command !== "test") {
+    const prompted = await maybeSendExperiencePrompt(client, userId);
+    if (prompted) return;
+  }
+
+  if (command === "leaderboard") {
+    const blocks = await buildLeaderboardBlocks(client, userLang, 0);
+    await client.chat.postMessage({
+      channel: event.channel,
+      text: t(userLang, "leaderboard.title"),
+      blocks,
+    });
+    return;
+  }
 
     if (sub === "list") {
       let game = channelId ? getGame(channelId) : null;
@@ -10128,7 +11200,11 @@ app.event("message", async ({ event, client }) => {
   }
 
   if (!game) {
-    const helpText = withDevHint(t(userLang, "dm.help_intro"), userLang, userId);
+    const helpText = withDevHint(
+      await getHelpText(userLang, userId, "dm.help_intro"),
+      userLang,
+      userId
+    );
     await client.chat.postMessage({
       channel: event.channel,
       text: helpText,
@@ -10584,7 +11660,7 @@ async function handleTelegramDetectiveMode(ctx, data) {
       return;
     }
     const choices = await buildUserChoices(null, targetIds);
-    const text = getPromptTextForAction(actorLang, game, nextAction);
+    const text = await getPromptTextForAction(actorLang, game, nextAction, actorId);
     const reply_markup = buildTelegramPlayerKeyboard({
       chatId: rawChatId,
       actionId: nextAction,
@@ -10711,7 +11787,7 @@ async function handleTelegramPageAction(ctx, data) {
     const totalPages = Math.max(1, Math.ceil(choices.length / BUTTON_PAGE_SIZE));
     const direction = data.action === ACTIONS.PAGE_NEXT ? 1 : -1;
     const newPage = Math.max(0, Math.min(totalPages - 1, data.page + direction));
-    const text = getPromptTextForAction(actorLang, game, actionType);
+    const text = await getPromptTextForAction(actorLang, game, actionType, actorId);
     const extraButtons = [];
     if (actionType === ACTIONS.DAY_VOTE && game.config.allowAbstain) {
       extraButtons.push({
@@ -11381,16 +12457,96 @@ async function handleTelegramFaqAction(ctx, data) {
 async function handleTelegramHelpAction(ctx, data) {
   const userId = getTelegramUserKeyFromCtx(ctx);
   const lang = await getUserLang(userId);
-  let text = t(lang, "dm.help_intro_tg");
-  if (data.action === ACTIONS.DM_HELP_ADD) text = t(lang, "dm.help_add_tg");
+  let text = await getHelpText(lang, userId, "dm.help_intro_tg");
+  if (data.action === ACTIONS.DM_HELP_ADD)
+    text = await getHelpText(lang, userId, "dm.help_add_tg");
   if (data.action === ACTIONS.DM_HELP_COMMANDS)
-    text = t(lang, "dm.help_commands_tg");
+    text = await getHelpText(lang, userId, "dm.help_commands_tg");
   if (data.action === ACTIONS.DM_HELP_SETTINGS)
-    text = t(lang, "dm.help_settings_tg");
+    text = await getHelpText(lang, userId, "dm.help_settings_tg");
   text = withDevHint(text, lang, userId);
 
   const reply_markup = buildTelegramDmHelpKeyboard(lang);
   await updateTelegramActionMessage(ctx, text, reply_markup);
+  await answerTelegramCallback(ctx);
+}
+
+async function handleTelegramExperienceAction(ctx, data) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = await getUserLang(userId);
+  const mode =
+    data.action === ACTIONS.EXPERIENCE_EXPERIENCED ? "experienced" : "novice";
+  await setUserExperienceMode(userId, mode);
+  await setExperiencePromptedAt(userId, null);
+  const context = data.chatId || "onboarding";
+  if (context === "prefs") {
+    const message = await buildTelegramPreferencesMessage(userId, lang);
+    await updateTelegramActionMessage(ctx, message.text, message.reply_markup);
+    await answerTelegramCallback(ctx);
+    return;
+  }
+  const text =
+    mode === "experienced"
+      ? t(lang, "onboarding.experience_set_experienced")
+      : t(lang, "onboarding.experience_set_novice");
+  const reply_markup = buildTelegramLeaderboardVisibilityKeyboard("onboarding", lang);
+  await updateTelegramActionMessage(ctx, text, reply_markup);
+  await answerTelegramCallback(ctx);
+}
+
+async function handleTelegramLeaderboardVisibilityAction(ctx, data) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = await getUserLang(userId);
+  const visible = data.action === ACTIONS.LEADERBOARD_SHOW;
+  await setLeaderboardVisible(userId, visible);
+  const context = data.chatId || "onboarding";
+  if (context === "prefs") {
+    const message = await buildTelegramPreferencesMessage(userId, lang);
+    await updateTelegramActionMessage(ctx, message.text, message.reply_markup);
+    await answerTelegramCallback(ctx);
+    return;
+  }
+  const text = visible
+    ? t(lang, "onboarding.leaderboard_set_show")
+    : t(lang, "onboarding.leaderboard_set_hide");
+  await updateTelegramActionMessage(ctx, text, undefined);
+  await answerTelegramCallback(ctx);
+}
+
+async function handleTelegramModeSuggestAction(ctx, data) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = await getUserLang(userId);
+  if (data.action === ACTIONS.MODE_SUGGEST_ACCEPT) {
+    await setUserExperienceMode(userId, "experienced");
+    await setExperiencePromptedAt(userId, now());
+    await updateTelegramActionMessage(ctx, t(lang, "mode.switched"), undefined);
+    await answerTelegramCallback(ctx);
+    return;
+  }
+  await setExperiencePromptedAt(userId, now());
+  await updateTelegramActionMessage(ctx, t(lang, "mode.kept"), undefined);
+  await answerTelegramCallback(ctx);
+}
+
+async function handleTelegramPrefsOpen(ctx) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = await getUserLang(userId);
+  const message = await buildTelegramPreferencesMessage(userId, lang);
+  await updateTelegramActionMessage(ctx, message.text, message.reply_markup);
+  await answerTelegramCallback(ctx);
+}
+
+async function handleTelegramLeaderboardAction(ctx, data) {
+  const userId = getTelegramUserKeyFromCtx(ctx);
+  const lang = await getUserLang(userId);
+  const page =
+    data.action === ACTIONS.LEADERBOARD_PAGE_NEXT
+      ? data.page + 1
+      : data.action === ACTIONS.LEADERBOARD_PAGE_PREV
+      ? Math.max(0, data.page - 1)
+      : data.page || 0;
+  const message = await buildTelegramLeaderboardMessage(lang, page);
+  await updateTelegramActionMessage(ctx, message.text, message.reply_markup);
   await answerTelegramCallback(ctx);
 }
 
@@ -11421,6 +12577,7 @@ async function handleTelegramLangSelect(ctx, data) {
   const text =
     updated.lang === "ru" ? t("ru", "dm.lang_set_ru") : t("en", "dm.lang_set_en");
   await updateTelegramActionMessage(ctx, text, undefined);
+  await maybeSendTelegramExperiencePrompt(ctx, userId);
   await answerTelegramCallback(ctx);
 }
 
@@ -11480,6 +12637,30 @@ async function handleTelegramCallback(ctx) {
 
   if (data.action === ACTIONS.LANG_SELECT_EN || data.action === ACTIONS.LANG_SELECT_RU) {
     await handleTelegramLangSelect(ctx, data);
+    return;
+  }
+
+  if (
+    data.action === ACTIONS.EXPERIENCE_NOVICE ||
+    data.action === ACTIONS.EXPERIENCE_EXPERIENCED
+  ) {
+    await handleTelegramExperienceAction(ctx, data);
+    return;
+  }
+
+  if (
+    data.action === ACTIONS.LEADERBOARD_SHOW ||
+    data.action === ACTIONS.LEADERBOARD_HIDE
+  ) {
+    await handleTelegramLeaderboardVisibilityAction(ctx, data);
+    return;
+  }
+
+  if (
+    data.action === ACTIONS.MODE_SUGGEST_ACCEPT ||
+    data.action === ACTIONS.MODE_SUGGEST_DECLINE
+  ) {
+    await handleTelegramModeSuggestAction(ctx, data);
     return;
   }
 
@@ -11597,12 +12778,26 @@ async function handleTelegramCallback(ctx) {
     return;
   }
 
+  if (data.action === ACTIONS.PREFS_OPEN) {
+    await handleTelegramPrefsOpen(ctx);
+    return;
+  }
+
   if (data.action === ACTIONS.FIND_GAMES_OPEN) {
     const userId = getTelegramUserKeyFromCtx(ctx);
     const lang = await getUserLang(userId);
     const message = await buildTelegramFindGamesMessage(lang, "recruiting", 0, "all");
     await replyToTelegramMessage(ctx, message.text, message.reply_markup);
     await answerTelegramCallback(ctx);
+    return;
+  }
+
+  if (
+    data.action === ACTIONS.LEADERBOARD_OPEN ||
+    data.action === ACTIONS.LEADERBOARD_PAGE_PREV ||
+    data.action === ACTIONS.LEADERBOARD_PAGE_NEXT
+  ) {
+    await handleTelegramLeaderboardAction(ctx, data);
     return;
   }
 
@@ -11659,6 +12854,46 @@ async function handleTelegramPrivateCommand(ctx, command, args) {
       ctx,
       updated.lang === "ru" ? t("ru", "dm.lang_set_ru") : t("en", "dm.lang_set_en")
     );
+    await maybeSendTelegramExperiencePrompt(ctx, userId);
+    return;
+  }
+
+  if (command === "help") {
+    const helpText = withDevHint(
+      await getHelpText(userLang, userId, "dm.help_intro_tg"),
+      userLang,
+      userId
+    );
+    await replyToTelegramMessage(ctx, helpText, buildTelegramDmHelpKeyboard(userLang));
+    return;
+  }
+
+  if (command === "mode") {
+    const choice = (args[0] || "").toLowerCase();
+    if (!["novice", "experienced"].includes(choice)) {
+      await replyToTelegramMessage(ctx, t(userLang, "mode.usage"));
+      return;
+    }
+    await setUserExperienceMode(userId, choice);
+    await setExperiencePromptedAt(userId, null);
+    await replyToTelegramMessage(
+      ctx,
+      choice === "experienced"
+        ? t(userLang, "onboarding.experience_set_experienced")
+        : t(userLang, "onboarding.experience_set_novice")
+    );
+    return;
+  }
+
+  if (command === "leaderboard") {
+    const message = await buildTelegramLeaderboardMessage(userLang, 0);
+    await replyToTelegramMessage(ctx, message.text, message.reply_markup);
+    return;
+  }
+
+  if (command === "prefs" || command === "preferences") {
+    const message = await buildTelegramPreferencesMessage(userId, userLang);
+    await replyToTelegramMessage(ctx, message.text, message.reply_markup);
     return;
   }
 
@@ -11733,7 +12968,7 @@ async function handleTelegramPrivateCommand(ctx, command, args) {
   }
 
   const helpText = withDevHint(
-    t(userLang, "dm.help_intro_tg"),
+    await getHelpText(userLang, userId, "dm.help_intro_tg"),
     userLang,
     userId
   );
@@ -11787,6 +13022,9 @@ async function handleTelegramPrivateText(ctx) {
     return;
   }
 
+  const prompted = await maybeSendTelegramExperiencePrompt(ctx, userId);
+  if (prompted) return;
+
   if (!langInfo.explicit && !languagePrompted.has(userId)) {
     languagePrompted.add(userId);
     const promptText = t("en", "dm.lang_prompt");
@@ -11800,7 +13038,7 @@ async function handleTelegramPrivateText(ctx) {
   }
 
   const helpText = withDevHint(
-    t(userLang, "dm.help_intro_tg"),
+    await getHelpText(userLang, userId, "dm.help_intro_tg"),
     userLang,
     userId
   );
@@ -12155,8 +13393,10 @@ async function startTelegram() {
       await replyToTelegramMessage(ctx, promptText, buildTelegramLangKeyboard());
       return;
     }
+    const prompted = await maybeSendTelegramExperiencePrompt(ctx, userId);
+    if (prompted) return;
     const helpText = withDevHint(
-      t(langInfo.lang, "dm.help_intro_tg"),
+      await getHelpText(langInfo.lang, userId, "dm.help_intro_tg"),
       langInfo.lang,
       userId
     );
@@ -12192,6 +13432,22 @@ async function startTelegram() {
   telegramBot.command(["mychannels", "my_channels"], async (ctx) => {
     if (!isTelegramPrivateChat(ctx)) return;
     await handleTelegramPrivateCommand(ctx, "mychannels", []);
+  });
+
+  telegramBot.command("leaderboard", async (ctx) => {
+    if (!isTelegramPrivateChat(ctx)) return;
+    await handleTelegramPrivateCommand(ctx, "leaderboard", []);
+  });
+
+  telegramBot.command(["prefs", "preferences"], async (ctx) => {
+    if (!isTelegramPrivateChat(ctx)) return;
+    await handleTelegramPrivateCommand(ctx, "prefs", []);
+  });
+
+  telegramBot.command("mode", async (ctx) => {
+    if (!isTelegramPrivateChat(ctx)) return;
+    const args = ctx.message?.text?.split(/\s+/).slice(1) || [];
+    await handleTelegramPrivateCommand(ctx, "mode", args);
   });
 
   telegramBot.command("lang", async (ctx) => {
@@ -12403,6 +13659,7 @@ async function restoreActiveGames() {
       ? SLACK_PORT
       : 0;
   await db.initDb();
+  setupHotRestart();
   startHealthServer();
   await app.start(slackPort);
   if (useTelegramWebhook) {
