@@ -113,6 +113,26 @@ function startHealthServer() {
         });
         return;
       }
+      if (url.pathname === "/assets") {
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "text/plain; charset=utf-8");
+        try {
+          const dirs = [ASSETS_DIR];
+          if (ASSETS_DIR_FALLBACK !== ASSETS_DIR) dirs.push(ASSETS_DIR_FALLBACK);
+          const lines = dirs.map((dir) => {
+            try {
+              const files = fs.readdirSync(dir);
+              return `${dir}: ${files.join(", ")}`;
+            } catch (err) {
+              return `${dir}: <unreadable>`;
+            }
+          });
+          res.end(lines.join("\n"));
+        } catch (err) {
+          res.end("No assets.");
+        }
+        return;
+      }
       if (url.pathname.startsWith("/assets/")) {
         if (req.method !== "GET" && req.method !== "HEAD") {
           res.statusCode = 405;
