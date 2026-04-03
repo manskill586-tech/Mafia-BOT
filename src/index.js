@@ -63,6 +63,7 @@ const TEST_ID_PREFIX = "test:";
 const PLATFORM_SLACK = "slack";
 const PLATFORM_TELEGRAM = "tg";
 const ASSETS_DIR = path.join(__dirname, "..", "assets");
+const ASSETS_DIR_FALLBACK = path.join(process.cwd(), "assets");
 const ASSET_FILES = {
   mafia: "Mafia.jpg",
   peace: "Peace.jpg",
@@ -77,6 +78,8 @@ const DEFAULT_LANG = "en";
 let telegramBot = null;
 let telegramMode = "disabled";
 let healthServer = null;
+let telegramWebhookHandler = null;
+let telegramWebhookPath = null;
 const tgUserCache = new Map();
 const tgChatCache = new Map();
 const tgHandleCache = new Map();
@@ -85,12 +88,31 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function setTelegramWebhookHandler(handler, hookPath) {
+  telegramWebhookHandler = handler || null;
+  telegramWebhookPath = hookPath || null;
+}
+
 function startHealthServer() {
   if (healthServer) return;
   if (!Number.isFinite(PORT) || PORT <= 0) return;
   healthServer = http.createServer((req, res) => {
     try {
       const url = new URL(req.url || "/", "http://localhost");
+      if (telegramWebhookHandler && telegramWebhookPath && url.pathname === telegramWebhookPath) {
+        if (req.method !== "POST") {
+          res.statusCode = 405;
+          res.end("Method Not Allowed");
+          return;
+        }
+        Promise.resolve(telegramWebhookHandler(req, res)).catch(() => {
+          if (!res.headersSent) {
+            res.statusCode = 500;
+            res.end("Webhook Error");
+          }
+        });
+        return;
+      }
       if (url.pathname.startsWith("/assets/")) {
         if (req.method !== "GET" && req.method !== "HEAD") {
           res.statusCode = 405;
@@ -98,17 +120,29 @@ function startHealthServer() {
           return;
         }
         const fileName = path.basename(url.pathname);
-        const filePath = path.join(ASSETS_DIR, fileName);
-        if (!filePath.startsWith(ASSETS_DIR)) {
-          res.statusCode = 403;
-          res.end("Forbidden");
-          return;
-        }
-        if (!fs.existsSync(filePath)) {
+        const resolved = resolveAssetPath(fileName);
+        if (!resolved || !resolved.path) {
+          try {
+            const dirs = [ASSETS_DIR];
+            if (ASSETS_DIR_FALLBACK !== ASSETS_DIR) dirs.push(ASSETS_DIR_FALLBACK);
+            const listings = dirs
+              .map((dir) => {
+                try {
+                  return `${dir}: ${fs.readdirSync(dir).join(", ")}`;
+                } catch (err) {
+                  return `${dir}: <unreadable>`;
+                }
+              })
+              .join(" | ");
+            console.warn(`Asset not found: ${fileName}. ${listings}`);
+          } catch (err) {
+            // ignore
+          }
           res.statusCode = 404;
           res.end("Not Found");
           return;
         }
+        const filePath = resolved.path;
         const ext = path.extname(filePath).toLowerCase();
         const contentType =
           ext === ".jpg" || ext === ".jpeg"
@@ -138,7 +172,10 @@ function startHealthServer() {
     }
   });
   healthServer.listen(PORT, () => {
-    console.log(`Health server listening on port ${PORT}.`);
+    console.log(`HTTP server listening on port ${PORT}.`);
+    if (telegramWebhookHandler && telegramWebhookPath) {
+      console.log(`Telegram webhook handler mounted at ${telegramWebhookPath}.`);
+    }
   });
 }
 
@@ -361,6 +398,11 @@ const I18N = {
       status_alive: ":alive: Alive" ,
       status_dead: ":skull: Eliminated" ,
       role_unknown: ":question: Unknown" ,
+      role_pending: ":question: Pending" ,
+      your_vote: ":vote: Your vote: {target}" ,
+      your_vote_none: ":vote: Your vote: not cast yet" ,
+      your_action: ":night: Your action: {target}" ,
+      your_action_none: ":night: Your action: not chosen yet" ,
       history_title: ":night: Last 3 nights" ,
       history_empty: ":night: No night results yet." ,
       history_line: ":night: Night {round}: {text}" ,
@@ -903,6 +945,11 @@ const I18N = {
       status_alive: ":alive: Жив" ,
       status_dead: ":skull: Выбыли" ,
       role_unknown: ":question: Неизвестно" ,
+      role_pending: ":question: Не назначена" ,
+      your_vote: ":vote: Ваш голос: {target}" ,
+      your_vote_none: ":vote: Ваш голос: еще не выбран" ,
+      your_action: ":night: Ваше действие: {target}" ,
+      your_action_none: ":night: Ваше действие: еще не выбрано" ,
       history_title: ":night: Последние 3 ночи" ,
       history_empty: ":night: Пока нет итогов ночи." ,
       history_line: ":night: Ночь {round}: {text}" ,
@@ -2816,7 +2863,33 @@ async function formatUserListPlain(client, userIds) {
 
 function getAssetUrl(fileName) {
   if (!ASSET_BASE_URL) return "";
-  return `${ASSET_BASE_URL}/assets/${fileName}`;
+  const resolved = resolveAssetPath(fileName);
+  if (!resolved) return "";
+  return `${ASSET_BASE_URL}/assets/${resolved.name}`;
+}
+
+function resolveAssetPath(fileName) {
+  if (!fileName) return null;
+  const fileLower = String(fileName).toLowerCase();
+  const dirs = [ASSETS_DIR];
+  if (ASSETS_DIR_FALLBACK !== ASSETS_DIR) dirs.push(ASSETS_DIR_FALLBACK);
+  for (const dir of dirs) {
+    try {
+      const direct = path.join(dir, fileName);
+      if (fs.existsSync(direct)) {
+        return { path: direct, name: fileName };
+      }
+      const match = fs
+        .readdirSync(dir)
+        .find((name) => name.toLowerCase() === fileLower);
+      if (match) {
+        return { path: path.join(dir, match), name: match };
+      }
+    } catch (err) {
+      // ignore and try next
+    }
+  }
+  return null;
 }
 
 function getHomeIconFile(game, userId) {
@@ -3734,6 +3807,93 @@ async function buildHomeBlocksDetailed(client, userId, lang) {
     },
   });
 
+  const formatHomeTarget = async (targetId) => {
+    if (!targetId) return null;
+    if (targetId === SPECIAL_TARGETS.ABSTAIN) return t(lang, "button.abstain");
+    if (targetId === SPECIAL_TARGETS.NO_KILL) return t(lang, "button.no_kill");
+    return getNameOrMention(client, game, targetId, lang);
+  };
+
+  if (game) {
+    const remaining =
+      game.phaseDeadline !== null
+        ? formatDuration(lang, game.phaseDeadline - now())
+        : "-";
+    const aliveCount = getAlivePlayerIds(game).length;
+    const status = isPlayerAlive(game, userId)
+      ? t(lang, "home.status_alive")
+      : t(lang, "home.status_dead");
+    const role =
+      game.state === "lobby"
+        ? t(lang, "home.role_pending")
+        : game.players?.[userId]?.role
+        ? roleLabel(game.players[userId].role, lang)
+        : t(lang, "home.role_unknown");
+    const currentLine = t(lang, "home.current_line", {
+      channel: channelMention(game.channelId),
+      phase: formatPhaseLabel(lang, game),
+      time: remaining,
+      alive: aliveCount,
+      status,
+      role,
+    });
+
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `*${t(lang, "home.current_title")}*\n${currentLine}` },
+    });
+
+    let actionLine = null;
+    if (game.state === "day") {
+      const voteTarget = await formatHomeTarget(game.day?.votes?.[userId]);
+      actionLine = voteTarget
+        ? t(lang, "home.your_vote", { target: voteTarget })
+        : t(lang, "home.your_vote_none");
+    } else if (game.state === "night") {
+      const roleKey = game.players?.[userId]?.role;
+      let actionTarget = null;
+      if (roleKey === "mafia" || roleKey === "godfather") {
+        actionTarget = await formatHomeTarget(game.night?.mafiaVotes?.[userId]);
+      } else if (roleKey === "doctor") {
+        actionTarget = await formatHomeTarget(game.night?.doctorSave);
+      } else if (game.roles?.detectiveId === userId) {
+        if (game.night?.detectiveKill) {
+          const target = await formatHomeTarget(game.night.detectiveKill);
+          actionTarget = target
+            ? `${t(lang, "button.detective_kill")} ${target}`
+            : null;
+        } else if (game.night?.detectiveCheck) {
+          const target = await formatHomeTarget(game.night.detectiveCheck);
+          actionTarget = target
+            ? `${t(lang, "button.detective_check")} ${target}`
+            : null;
+        }
+      } else if (roleKey === "bodyguard") {
+        actionTarget = await formatHomeTarget(game.night?.bodyguardProtect);
+      } else if (roleKey === "bum") {
+        actionTarget = await formatHomeTarget(game.night?.bumVisit);
+      } else if (roleKey === "lawyer") {
+        actionTarget = await formatHomeTarget(game.night?.lawyerProtect);
+      } else if (roleKey === "stalker") {
+        actionTarget = await formatHomeTarget(game.night?.stalkerKill);
+      }
+      actionLine = actionTarget
+        ? t(lang, "home.your_action", { target: actionTarget })
+        : t(lang, "home.your_action_none");
+    } else {
+      actionLine = t(lang, "home.your_action_none");
+    }
+
+    if (actionLine) {
+      blocks.push({
+        type: "section",
+        text: { type: "mrkdwn", text: actionLine },
+      });
+    }
+
+    return blocks;
+  }
+
   const roleStats = await getUserRoleStats(userId);
   const roleLines =
     roleStats.length > 0
@@ -3752,75 +3912,32 @@ async function buildHomeBlocksDetailed(client, userId, lang) {
     },
   });
 
-  if (!game) {
-    blocks.push({
-      type: "section",
-      text: { type: "mrkdwn", text: t(lang, "home.current_none") },
-    });
-  } else {
-    const channelStats = await getUserChannelStats(userId, game.channelId);
-    blocks.push({
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text:
-          `*${t(lang, "home.channel_stats_title")}*\n` +
-          t(lang, "home.channel_stats_line", {
-            games: channelStats.games,
-            wins: channelStats.wins,
-            losses: channelStats.losses,
-            rate: computeWinRate(channelStats),
-          }),
-      },
-    });
+  blocks.push({
+    type: "section",
+    text: { type: "mrkdwn", text: t(lang, "home.current_none") },
+  });
 
-    const remaining =
-      game.phaseDeadline !== null
-        ? formatDuration(lang, game.phaseDeadline - now())
-        : "-";
-    const aliveCount = getAlivePlayerIds(game).length;
-    const status = isPlayerAlive(game, userId)
-      ? t(lang, "home.status_alive")
-      : t(lang, "home.status_dead");
-    const role = game.players?.[userId]?.role
-      ? roleLabel(game.players[userId].role, lang)
-      : t(lang, "home.role_unknown");
-    const currentLine = t(lang, "home.current_line", {
-      channel: channelMention(game.channelId),
-      phase: formatPhaseLabel(lang, game),
-      time: remaining,
-      alive: aliveCount,
-      status,
-      role,
-    });
+  const history = game?.history?.nights || [];
+  const historyLines =
+    history.length > 0
+      ? history
+          .slice(0, 3)
+          .map((entry) =>
+            t(lang, "home.history_line", {
+              round: entry.round,
+              text: entry[lang] || entry.en || entry.ru,
+            })
+          )
+          .join("\n")
+      : t(lang, "home.history_empty");
 
-    blocks.push({
-      type: "section",
-      text: { type: "mrkdwn", text: `*${t(lang, "home.current_title")}*\n${currentLine}` },
-    });
-
-    const history = game.history?.nights || [];
-    const historyLines =
-      history.length > 0
-        ? history
-            .slice(0, 3)
-            .map((entry) =>
-              t(lang, "home.history_line", {
-                round: entry.round,
-                text: entry[lang] || entry.en || entry.ru,
-              })
-            )
-            .join("\n")
-        : t(lang, "home.history_empty");
-
-    blocks.push({
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `*${t(lang, "home.history_title")}*\n${historyLines}`,
-      },
-    });
-  }
+  blocks.push({
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `*${t(lang, "home.history_title")}*\n${historyLines}`,
+    },
+  });
 
   blocks.push({ type: "divider" });
   blocks.push({
@@ -12124,51 +12241,12 @@ async function startTelegram() {
     const maxAttempts = 3;
     while (attempt < maxAttempts) {
       try {
-        await telegramBot.launch({
-          webhook: { domain: TELEGRAM_WEBHOOK_DOMAIN, hookPath, port: PORT },
-        });
+        setTelegramWebhookHandler(telegramBot.webhookCallback(hookPath), hookPath);
+        await telegramBot.telegram.setWebhook(`${TELEGRAM_WEBHOOK_DOMAIN}${hookPath}`);
         telegramMode = "webhook";
         console.log("Telegram bot is running (webhook).");
         return telegramMode;
       } catch (err) {
-        if (telegramBot.webhookServer) {
-          try {
-            telegramBot.webhookServer.close();
-          } catch (closeErr) {
-            console.warn(
-              "Failed to close Telegram webhook server:",
-              closeErr?.message || closeErr
-            );
-          } finally {
-            telegramBot.webhookServer = undefined;
-          }
-        }
-        if (err?.code === "EADDRINUSE") {
-          console.warn(
-            `Telegram webhook port ${PORT} is already in use. Falling back to polling.`
-          );
-          try {
-            await telegramBot.telegram.deleteWebhook();
-          } catch (deleteErr) {
-            console.warn(
-              "Failed to delete Telegram webhook before polling:",
-              deleteErr?.message || deleteErr
-            );
-          }
-          telegramMode = "polling";
-          telegramBot
-            .launch()
-            .then(() => {
-              console.log("Telegram bot is running (polling).");
-            })
-            .catch((launchErr) => {
-              console.error(
-                "Telegram polling failed:",
-                launchErr?.message || launchErr
-              );
-            });
-          return telegramMode;
-        }
         const retryAfter =
           err?.response?.parameters?.retry_after ||
           err?.parameters?.retry_after ||
@@ -12184,12 +12262,38 @@ async function startTelegram() {
           attempt += 1;
           continue;
         }
-        throw err;
+        console.warn(
+          "Telegram webhook failed. Falling back to polling:",
+          err?.message || err
+        );
+        try {
+          await telegramBot.telegram.deleteWebhook();
+        } catch (deleteErr) {
+          console.warn(
+            "Failed to delete Telegram webhook before polling:",
+            deleteErr?.message || deleteErr
+          );
+        }
+        setTelegramWebhookHandler(null, null);
+        telegramMode = "polling";
+        telegramBot
+          .launch()
+          .then(() => {
+            console.log("Telegram bot is running (polling).");
+          })
+          .catch((launchErr) => {
+            console.error(
+              "Telegram polling failed:",
+              launchErr?.message || launchErr
+            );
+          });
+        return telegramMode;
       }
     }
     console.warn(
       "Telegram webhook failed after retries. Falling back to polling."
     );
+    setTelegramWebhookHandler(null, null);
     telegramMode = "polling";
     telegramBot
       .launch()
@@ -12203,6 +12307,7 @@ async function startTelegram() {
   }
 
   telegramMode = "polling";
+  setTelegramWebhookHandler(null, null);
   telegramBot
     .launch()
     .then(() => {
@@ -12278,6 +12383,7 @@ async function restoreActiveGames() {
       ? SLACK_PORT
       : 0;
   await db.initDb();
+  startHealthServer();
   await app.start(slackPort);
   if (useTelegramWebhook) {
     console.log(
@@ -12290,9 +12396,6 @@ async function restoreActiveGames() {
   } catch (err) {
     console.error("Telegram failed to start:", err?.message || err);
     telegramMode = "disabled";
-  }
-  if (telegramMode !== "webhook") {
-    startHealthServer();
   }
   startKeepAlive();
   await restoreActiveGames();

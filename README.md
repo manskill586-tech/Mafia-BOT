@@ -70,6 +70,7 @@ Lobby → Night: Mafia selects Alice, Doctor saves Alice → Day: town votes Bob
 - Home icon requires public access to assets:
   - Set `ASSET_BASE_URL=https://<your-domain>` (e.g., your Render domain).
   - The bot serves `/assets/*` via the health server (PORT).
+- Webhook mode still serves `/assets/*` from the same HTTP server.
 - If `ASSET_BASE_URL` is not set, Home icons are hidden (text only).
 
 ## Beginner Guide (Slack, step by step)
