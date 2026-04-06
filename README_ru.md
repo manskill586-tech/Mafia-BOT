@@ -15,6 +15,8 @@
 4. Создайте `.env` на основе `.env.example`.
 5. Установите зависимости и запустите:
 
+6. Ctrl+Shift+R / Ctrl+Alt+R / Ctrl+R в терминале, чтобы перезагрузить бота после изменений в коде.
+
 ```bash
 cd /d E:\my_projects\Mafia Slack Bot
 npm.cmd start

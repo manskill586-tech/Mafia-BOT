@@ -119,18 +119,39 @@ function setupHotRestart() {
   if (!process.stdin || !process.stdin.isTTY) return;
   try {
     readline.emitKeypressEvents(process.stdin);
-    if (process.stdin.setRawMode) process.stdin.setRawMode(true);
+    let rawEnabled = false;
+    if (process.stdin.setRawMode) {
+      process.stdin.setRawMode(true);
+      rawEnabled = true;
+    }
     process.stdin.on("keypress", (_str, key) => {
       if (!key) return;
       const isCtrlShiftR = key.ctrl && key.shift && key.name === "r";
       const isCtrlAltR = key.ctrl && key.meta && key.name === "r";
-      if (isCtrlShiftR || isCtrlAltR) {
-        restartProcess(isCtrlShiftR ? "Ctrl+Shift+R" : "Ctrl+Alt+R");
+      const isCtrlR = key.ctrl && key.name === "r";
+      if (isCtrlShiftR || isCtrlAltR || isCtrlR) {
+        restartProcess(
+          isCtrlShiftR ? "Ctrl+Shift+R" : isCtrlAltR ? "Ctrl+Alt+R" : "Ctrl+R"
+        );
       }
     });
+    if (!rawEnabled) {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+        terminal: true,
+      });
+      rl.on("line", (line) => {
+        const cmd = String(line || "").trim().toLowerCase();
+        if (cmd === "rs" || cmd === "restart") {
+          restartProcess(`command ${cmd}`);
+        }
+      });
+      console.log("Hot restart fallback: type 'rs' or 'restart' and press Enter.");
+    }
     process.stdin.resume();
     hotRestartEnabled = true;
-    console.log("Hot restart enabled: Ctrl+Shift+R (or Ctrl+Alt+R).");
+    console.log("Hot restart enabled: Ctrl+Shift+R / Ctrl+Alt+R / Ctrl+R.");
   } catch (err) {
     console.warn("Hot restart setup failed:", err);
   }

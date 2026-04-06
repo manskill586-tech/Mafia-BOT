@@ -15,6 +15,8 @@ Telegram support is optional and documented at the end. The main focus is Slack.
 4. Create `.env` from `.env.example`.
 5. Install deps and run:
 
+6. Ctrl+Shift+R / Ctrl+Alt+R / Ctrl+R in CMD to refresh the bot if you update the code.
+
 
 ```bash
 npm install
