@@ -1,6 +1,6 @@
 ﻿# Mafia Slack Bot
 
-###IF YOU DON’T WANT TO PLAY:
+#IF YOU DON’T WANT TO PLAY:
 
 https://pub-64293201d44f43b4ac080769f6b433af.r2.dev/proof-videos/1775984486642-Recording_2026-04-12_143101.mp4
 
